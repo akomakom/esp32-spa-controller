@@ -1,11 +1,11 @@
 #include "web.h"
 
 
-const char* WEB_RESPONSE_OK = R"({ "success": true })";
-const char* WEB_RESPONSE_FAIL = R"({ "success": false })";
+const char *WEB_RESPONSE_OK = R"({ "success": true })";
+const char *WEB_RESPONSE_FAIL = R"({ "success": false })";
 
 // ensure there are no )" sequences in quoted text:
-const char* WEBPAGE_CONTROLS = R"(
+const char *WEBPAGE_CONTROLS = R"(
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -106,102 +106,102 @@ const char* WEBPAGE_CONTROLS = R"(
  * Login page
  */
 
-const char* WEBPAGE_LOGIN =
- "<form name='loginForm'>"
-    "<table width='20%' bgcolor='A09F9F' align='center'>"
+const char *WEBPAGE_LOGIN =
+        "<form name='loginForm'>"
+        "<table width='20%' bgcolor='A09F9F' align='center'>"
         "<tr>"
-            "<td colspan=2>"
-                "<center><font size=4><b>ESP32 Login Page AKOM</b></font></center>"
-                "<br>"
-            "</td>"
-            "<br>"
-            "<br>"
+        "<td colspan=2>"
+        "<center><font size=4><b>ESP32 Login Page AKOM</b></font></center>"
+        "<br>"
+        "</td>"
+        "<br>"
+        "<br>"
         "</tr>"
         "<tr>"
-             "<td>Username:</td>"
-             "<td><input type='text' size=25 name='userid'><br></td>"
+        "<td>Username:</td>"
+        "<td><input type='text' size=25 name='userid'><br></td>"
         "</tr>"
         "<br>"
         "<br>"
         "<tr>"
-            "<td>Password:</td>"
-            "<td><input type='Password' size=25 name='pwd'><br></td>"
-            "<br>"
-            "<br>"
+        "<td>Password:</td>"
+        "<td><input type='Password' size=25 name='pwd'><br></td>"
+        "<br>"
+        "<br>"
         "</tr>"
         "<tr>"
-            "<td><input type='submit' onclick='check(this.form)' value='Login'></td>"
+        "<td><input type='submit' onclick='check(this.form)' value='Login'></td>"
         "</tr>"
-    "</table>"
-"</form>"
-"<script>"
-    "function check(form)"
-    "{"
-    "if(form.userid.value=='admin' && form.pwd.value=='admin')"
-    "{"
-    "window.open('/serverIndex')"
-    "}"
-    "else"
-    "{"
-    " alert('Error Password or Username')/*displays error message*/"
-    "}"
-    "}"
-"</script>";
+        "</table>"
+        "</form>"
+        "<script>"
+        "function check(form)"
+        "{"
+        "if(form.userid.value=='admin' && form.pwd.value=='admin')"
+        "{"
+        "window.open('/serverIndex')"
+        "}"
+        "else"
+        "{"
+        " alert('Error Password or Username')/*displays error message*/"
+        "}"
+        "}"
+        "</script>";
 
 /*
  * Server Index Page
  */
 
-const char* WEBPAGE_UPDATE =
-"<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"
-"<form method='POST' action='#' enctype='multipart/form-data' id='upload_form'>"
-   "<input type='file' name='update'>"
+const char *WEBPAGE_UPDATE =
+        "<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"
+        "<form method='POST' action='#' enctype='multipart/form-data' id='upload_form'>"
+        "<input type='file' name='update'>"
         "<input type='submit' value='Update'>"
-    "</form>"
- "<div id='prg'>progress: 0%</div>"
- "<script>"
-  "$('form').submit(function(e){"
-  "e.preventDefault();"
-  "var form = $('#upload_form')[0];"
-  "var data = new FormData(form);"
-  " $.ajax({"
-  "url: '/update',"
-  "type: 'POST',"
-  "data: data,"
-  "contentType: false,"
-  "processData:false,"
-  "xhr: function() {"
-  "var xhr = new window.XMLHttpRequest();"
-  "xhr.upload.addEventListener('progress', function(evt) {"
-  "if (evt.lengthComputable) {"
-  "var per = evt.loaded / evt.total;"
-  "$('#prg').html('progress: ' + Math.round(per*100) + '%');"
-  "}"
-  "}, false);"
-  "return xhr;"
-  "},"
-  "success:function(d, s) {"
-  "console.log('success!')"
- "},"
- "error: function (a, b, c) {"
- "}"
- "});"
- "});"
- "</script>"; 
+        "</form>"
+        "<div id='prg'>progress: 0%</div>"
+        "<script>"
+        "$('form').submit(function(e){"
+        "e.preventDefault();"
+        "var form = $('#upload_form')[0];"
+        "var data = new FormData(form);"
+        " $.ajax({"
+        "url: '/update',"
+        "type: 'POST',"
+        "data: data,"
+        "contentType: false,"
+        "processData:false,"
+        "xhr: function() {"
+        "var xhr = new window.XMLHttpRequest();"
+        "xhr.upload.addEventListener('progress', function(evt) {"
+        "if (evt.lengthComputable) {"
+        "var per = evt.loaded / evt.total;"
+        "$('#prg').html('progress: ' + Math.round(per*100) + '%');"
+        "}"
+        "}, false);"
+        "return xhr;"
+        "},"
+        "success:function(d, s) {"
+        "console.log('success!')"
+        "},"
+        "error: function (a, b, c) {"
+        "}"
+        "});"
+        "});"
+        "</script>";
 
 
-
-void sendJSONResponse(const char* content) {
-  sendJSONResponse(content, 200);
-}
-void sendJSONResponse(const char* content, int code) {
-  server.sendHeader("Connection", "close");
-  server.send(code, "application/json", content);
+void sendJSONResponse(const char *content) {
+    sendJSONResponse(content, 200);
 }
 
-void sendHTMLResponse(const char* content) {
-  server.sendHeader("Connection", "close");
-  server.send(200, "text/html", content);
+void sendJSONResponse(const char *content, int code) {
+    server.sendHeader("Connection", "close");
+    server.send(code, "application/json", content);
+}
+
+void sendHTMLResponse(const char *content) {
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/html", content);
 }
 
 void setupServerDefaultActions() {
@@ -217,7 +217,7 @@ void setupServerDefaultActions() {
         server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
         ESP.restart();
     }, []() {
-        HTTPUpload& upload = server.upload();
+        HTTPUpload &upload = server.upload();
         if (upload.status == UPLOAD_FILE_START) {
             Serial.printf("Update: %s\n", upload.filename.c_str());
             if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { //start with max available size
