@@ -11,20 +11,36 @@ SpaControl::SpaControl(const char* name) {
   init(name, DEFAULT_MIN, DEFAULT_MAX);
 }
 
-void SpaControl::init(const char* t_name, u_int8_t t_min, u_int8_t t_max) {
-  name = t_name;
-  min = t_min;
-  max = t_max;
+void SpaControl::init(const char *name, u_int8_t min, u_int8_t max) {
+    this->name = name;
+    this->min = min;
+    this->max = max;
 }
 
-void SpaControl::toggle() {}
+void SpaControl::toggle() {
+    incrementValue();
+    Serial.println("PARENT!!! Value after unimplemented toggle is "); Serial.println(value);
+}
 void SpaControl::applyOutputs() {}
+void SpaControl::incrementValue() {
+    value++;
+    if (value > max) {
+        value = 0;
+    }
+    Serial.println("Value after toggle is "); Serial.println(value);
+}
 
 
 /*** SimpleSpaControl ***/
 
-SimpleSpaControl::SimpleSpaControl(const char* name, u_int8_t pin) : SpaControl(name) {
-  pinMode(pin, OUTPUT);
+SimpleSpaControl::SimpleSpaControl(const char *name, u_int8_t pin) : SpaControl(name) {
+    // TODO: re-enable
+    this->pin = pin;
+    pinMode(pin, OUTPUT);
+    Serial.print("Setting pinmode for ");
+    Serial.print(name);
+    Serial.print(" to ");
+    Serial.println(pin);
 }
 
 SimpleSpaControl::SimpleSpaControl(const char* name, u_int8_t pin, u_int8_t min, u_int8_t max) : SpaControl(name, min, max) {
@@ -32,15 +48,49 @@ SimpleSpaControl::SimpleSpaControl(const char* name, u_int8_t pin, u_int8_t min,
 }
 
 void SimpleSpaControl::toggle() {
-  value++;
-  if (value > max) {
-    value = 0;
-  }
+    SpaControl::toggle();
 }
 
 void SimpleSpaControl::applyOutputs() {
+    //TDOD: re-enable
   digitalWrite(pin, value ? HIGH : LOW);
 }
+
+TwoSpeedSpaControl::TwoSpeedSpaControl(const char *name, u_int8_t pin_power, u_int8_t pin_speed) : SpaControl(name) {
+    this->name = name;
+    this->power = new SimpleSpaControl(name, pin_power);
+    this->speed = new SimpleSpaControl(name, pin_speed);
+    this->max = 2; // 0,1,2 - off/low/high
+}
+/**
+ * States are (Power/Speed), in order:
+ * 0/0
+ * 1/0
+ * 1/1
+ * (repeat)
+ */
+void TwoSpeedSpaControl::toggle() {
+    incrementValue();
+    switch(value) {
+        case 0:
+            this->power->value = 0;
+            this->speed->value = 0;
+            break;
+        case 1:
+            this->power->value = 1;
+            this->speed->value = 0;
+            break;
+        case 2:
+            this->power->value = 1;
+            this->speed->value = 1;
+            break;
+    }
+}
+void TwoSpeedSpaControl::applyOutputs() {
+    this->power->applyOutputs();
+    this->speed->applyOutputs();
+}
+
 
 /*** SpaStatus ***/
 
