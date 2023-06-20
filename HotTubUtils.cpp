@@ -4,18 +4,10 @@
 
 /*** SpaControl ***/
 
-SpaControl::SpaControl(const char *name, u_int8_t min, u_int8_t max) {
-    init(name, min, max);
-}
 
-SpaControl::SpaControl(const char *name) {
-    init(name, DEFAULT_MIN, DEFAULT_MAX);
-}
-
-void SpaControl::init(const char *name, u_int8_t min, u_int8_t max) {
+SpaControl::SpaControl(const char *name, const char *type) {
     this->name = name;
-    this->min = min;
-    this->max = max;
+    this->type = type;
 }
 
 void SpaControl::toggle() {
@@ -24,12 +16,20 @@ void SpaControl::toggle() {
     Serial.println(value);
 }
 
+void SpaControl::set(u_int8_t value) {
+    if (value < min || value > max) {
+        throw std::invalid_argument("Provided value for control is outside allowed range");
+    }
+    this->value = value; // base class simply accepts the value
+}
+
 void SpaControl::applyOutputs() {}
 
 void SpaControl::incrementValue() {
-    value++;
-    if (value > max) {
-        value = 0;
+    if (value >= max) {
+        set(0);
+    } else {
+        set(value + 1);
     }
     Serial.println("Value after toggle is ");
     Serial.println(value);
@@ -38,17 +38,8 @@ void SpaControl::incrementValue() {
 
 /*** SimpleSpaControl ***/
 
-SimpleSpaControl::SimpleSpaControl(const char *name, u_int8_t pin) : SpaControl(name) {
+SimpleSpaControl::SimpleSpaControl(const char *name, u_int8_t pin) : SpaControl(name, "off-on") {
     this->pin = pin;
-    pinMode(pin, OUTPUT);
-    Serial.print("Setting pinmode for ");
-    Serial.print(name);
-    Serial.print(" to ");
-    Serial.println(pin);
-}
-
-SimpleSpaControl::SimpleSpaControl(const char *name, u_int8_t pin, u_int8_t min, u_int8_t max) : SpaControl(name, min,
-                                                                                                            max) {
     pinMode(pin, OUTPUT);
 }
 
@@ -60,8 +51,7 @@ void SimpleSpaControl::applyOutputs() {
     digitalWrite(pin, value ? HIGH : LOW);
 }
 
-TwoSpeedSpaControl::TwoSpeedSpaControl(const char *name, u_int8_t pin_power, u_int8_t pin_speed) : SpaControl(name) {
-    this->name = name;
+TwoSpeedSpaControl::TwoSpeedSpaControl(const char *name, u_int8_t pin_power, u_int8_t pin_speed) : SpaControl(name, "off-low-high") {
     this->power = new SimpleSpaControl(name, pin_power);
     this->speed = new SimpleSpaControl(name, pin_speed);
     this->max = 2; // 0,1,2 - off/low/high
@@ -76,6 +66,10 @@ TwoSpeedSpaControl::TwoSpeedSpaControl(const char *name, u_int8_t pin_power, u_i
  */
 void TwoSpeedSpaControl::toggle() {
     incrementValue();
+}
+
+void TwoSpeedSpaControl::set(u_int8_t value) {
+    SpaControl::set(value);  // this will check the argument
     switch (value) {
         case 0:
             this->power->value = 0;
@@ -101,11 +95,17 @@ void TwoSpeedSpaControl::applyOutputs() {
 /*** SpaStatus ***/
 
 SpaStatus::SpaStatus() {
+    for (SpaControl *control: controls) {
+        control->jsonStatus = jsonStatusControls.createNestedObject(control->name);
+    }
 }
 
 void SpaStatus::updateStatusString() {
     for (SpaControl *control: controls) {
-        jsonStatusControls[control->name] = control->value;
+        control->jsonStatus["value"] = control->value;
+        control->jsonStatus["min"] = control->min;
+        control->jsonStatus["max"] = control->max;
+        control->jsonStatus["type"] = control->type;
     }
 
     jsonStatusMetrics["temp"] = 100;

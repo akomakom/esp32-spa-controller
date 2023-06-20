@@ -7,6 +7,11 @@
 #include <stdexcept>
 #include <Preferences.h>
 #include <ArduinoJson.h>
+#include <TimeLib.h>
+#include <TimeAlarms.h>
+
+// needs to be large enough to allocate json document and string representation
+#define STATUS_LENGTH 400
 
 // 8 channel relay ESP32-WROOM module from China:
 const int RELAY_PIN_1 = 32;
@@ -19,22 +24,48 @@ const int RELAY_PIN_7 = 12;
 const int RELAY_PIN_8 = 13;
 const int LED_PIN = 23;
 
+//
+//class SpaControlScheduler {
+//public:
+//
+//    /**
+//     * Schedule on-time through the day.
+//     * @param percentageOfDayOnTime
+//     * @param numberOfTimesToRun
+//     */
+//    void normalSchedule(u_int8_t percentageOfDayOnTime, u_int8_t numberOfTimesToRun, u_int8_t valueOn);
+//
+//    void scheduleOverride(time_t startTime, time_t  )
+//    /**
+//     * Do not run automatic scheduled tasks for this period
+//     * @param seconds set to 0 to restore normal functionality early
+//     * @return
+//     */
+//    void ignoreSchedule(int seconds);
+//
+//
+//private:
+//
+//};
+
 class SpaControl {
     const int DEFAULT_MIN = 0;
     const int DEFAULT_MAX = 1;
 public:
-    SpaControl(const char *name);
-
-    SpaControl(const char *name, u_int8_t min, u_int8_t max);
+    SpaControl(const char *name, const char *type);
 
     virtual void toggle();
+
+    virtual void set(u_int8_t value);
 
     virtual void applyOutputs();
 
     const char *name;
     u_int8_t min = DEFAULT_MIN;
     u_int8_t max = DEFAULT_MAX;
+    const char *type;
     u_int8_t value = 0;
+    JsonObject jsonStatus;
 
 private:
     void init(const char *name, u_int8_t min, u_int8_t max);
@@ -46,8 +77,6 @@ protected:
 class SimpleSpaControl : public SpaControl {
 public:
     SimpleSpaControl(const char *name, u_int8_t pin);
-
-    SimpleSpaControl(const char *name, u_int8_t pin, u_int8_t min, u_int8_t max);
 
     virtual void toggle();
 
@@ -67,6 +96,8 @@ public:
 
     virtual void toggle();
 
+    virtual void set(u_int8_t value);
+
     virtual void applyOutputs();
 
 private:
@@ -76,7 +107,7 @@ private:
 
 class SpaStatus {
 private:
-    StaticJsonDocument<200> jsonStatus;
+    StaticJsonDocument<STATUS_LENGTH> jsonStatus;
     JsonObject jsonStatusControls = jsonStatus.createNestedObject("controls");
     JsonObject jsonStatusMetrics = jsonStatus.createNestedObject("metrics");
 
@@ -91,12 +122,13 @@ public:
     SpaControl *ozone = new SimpleSpaControl("ozone", RELAY_PIN_5);
 
 
-    char statusString[100];
+    char statusString[STATUS_LENGTH];
 
     void updateStatusString();
 
 //    SpaControl *controls[3] = {blower, heater, ozone};
     SpaControl *controls[4] = {pump, blower, heater, ozone};
+
 //    SpaControl *controls[5] = {pump, pump_fast, blower, heater, ozone};
 
     SpaControl *findByName(const char *name);

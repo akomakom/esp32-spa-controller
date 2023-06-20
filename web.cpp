@@ -71,7 +71,7 @@ const char *WEBPAGE_CONTROLS = R"(
 
                             let button = $('<button type="button" class="spacontrol"></button>');
                             button
-                                .attr('value', data.controls[name])
+                                .attr('value', data.controls[name]['value'])
                                 .attr('name', name)
                                 .text(name)
                                 .on('click', toggleClickHandler);
@@ -82,8 +82,8 @@ const char *WEBPAGE_CONTROLS = R"(
                     $('button.spacontrol').each(function () {
                         let button = $(this);
                         let name = button.attr('name');
-                        button.attr('value', data.controls[name]);
-                        button.text(name + "(" + data.controls[name] + ") "); //space for C R syntax
+                        button.attr('value', data.controls[name]['value']);
+                        button.text(name + "(" + data.controls[name]['value'] + ") "); //space for C R syntax
                     })
                 });
             };
