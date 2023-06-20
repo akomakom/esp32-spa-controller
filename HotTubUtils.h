@@ -24,9 +24,11 @@ class SpaControl {
     const int DEFAULT_MAX = 1;
 public:
     SpaControl(const char *name);
+
     SpaControl(const char *name, u_int8_t min, u_int8_t max);
 
     virtual void toggle();
+
     virtual void applyOutputs();
 
     const char *name;
@@ -36,6 +38,7 @@ public:
 
 private:
     void init(const char *name, u_int8_t min, u_int8_t max);
+
 protected:
     void incrementValue();
 };
@@ -43,9 +46,11 @@ protected:
 class SimpleSpaControl : public SpaControl {
 public:
     SimpleSpaControl(const char *name, u_int8_t pin);
+
     SimpleSpaControl(const char *name, u_int8_t pin, u_int8_t min, u_int8_t max);
 
     virtual void toggle();
+
     virtual void applyOutputs();
 
     u_int8_t pin;
@@ -59,12 +64,14 @@ public:
 class TwoSpeedSpaControl : public SpaControl {
 public:
     TwoSpeedSpaControl(const char *name, u_int8_t pin_power, u_int8_t pin_speed);
+
     virtual void toggle();
+
     virtual void applyOutputs();
 
 private:
-    SimpleSpaControl* power;
-    SimpleSpaControl* speed;
+    SimpleSpaControl *power;
+    SimpleSpaControl *speed;
 };
 
 class SpaStatus {
