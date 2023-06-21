@@ -24,29 +24,56 @@ const int RELAY_PIN_7 = 12;
 const int RELAY_PIN_8 = 13;
 const int LED_PIN = 23;
 
-//
-//class SpaControlScheduler {
-//public:
-//
-//    /**
-//     * Schedule on-time through the day.
-//     * @param percentageOfDayOnTime
-//     * @param numberOfTimesToRun
-//     */
-//    void normalSchedule(u_int8_t percentageOfDayOnTime, u_int8_t numberOfTimesToRun, u_int8_t valueOn);
-//
-//    void scheduleOverride(time_t startTime, time_t  )
-//    /**
-//     * Do not run automatic scheduled tasks for this period
-//     * @param seconds set to 0 to restore normal functionality early
-//     * @return
-//     */
-//    void ignoreSchedule(int seconds);
-//
-//
-//private:
-//
-//};
+
+class SpaControlScheduler {
+public:
+
+    /**
+     * Schedule on-time through the day.
+     * @param percentageOfDayOnTime eg 50
+     * @param numberOfTimesToRun eg 5, meaning run 50% in a 24 hour period, break up on-time into 5 segments
+     * @param normalValueOn when in on phase, this should be the control's value
+     * @param normalValueOff when in off phase, this should be the control's value
+     */
+    void normalSchedule(u_int8_t percentageOfDayOnTime, u_int8_t numberOfTimesToRun, u_int8_t normalValueOn, u_int8_t normalValueOff);
+
+    /**
+     *  Override normal schedule during this period
+     * @param startTime
+     * @param endTime
+     * @param valueOverride
+     */
+    void scheduleOverride(time_t startTime, time_t endTime, u_int8_t valueOverride);
+
+    void cancelOverride();
+    /**
+     * @return true if a schedule is in effect, whether normal or override
+     */
+    bool isScheduleEnabled();
+
+    /**
+     * @return scheduled value if schedule is enabled (see isScheduleEnabled)
+     * If override is enabled, returns overrideValue
+     * if only normal schedule is enabled, returns normalValueOn or normalValueOff
+     * If neither is enabled, returns SCHEDULER_DISABLED_VALUE
+     */
+    u_int8_t getScheduledValue();
+
+private:
+    static const u_int8_t SCHEDULER_DISABLED_VALUE = -1;
+    u_int8_t percentageOfDayOnTime = SCHEDULER_DISABLED_VALUE;
+    u_int8_t numberOfTimesToRun = SCHEDULER_DISABLED_VALUE;
+    u_int8_t normalValueOn = SCHEDULER_DISABLED_VALUE;
+    u_int8_t normalValueOff = SCHEDULER_DISABLED_VALUE;
+
+    u_int8_t overrideStartTime = now();
+    u_int8_t overrideEndTime = now();
+    u_int8_t overrideValue = SCHEDULER_DISABLED_VALUE;
+
+    bool isNormalScheduleEnabled();
+    bool isOverrideScheduleEnabled();
+
+};
 
 class SpaControl {
     const int DEFAULT_MIN = 0;

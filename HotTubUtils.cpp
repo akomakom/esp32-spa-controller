@@ -2,9 +2,66 @@
 #include "esp32-hal-gpio.h"
 #include "HotTubUtils.h"
 
+/*** SpaControlScheduler ***/
+void
+SpaControlScheduler::normalSchedule(u_int8_t percentageOfDayOnTime, u_int8_t numberOfTimesToRun, u_int8_t normalValueOn,
+                                    u_int8_t normalValueOff) {
+    this->percentageOfDayOnTime = percentageOfDayOnTime;
+    this->numberOfTimesToRun = numberOfTimesToRun;
+    this->normalValueOn = normalValueOn;
+    this->normalValueOff = normalValueOff;
+}
+
+void SpaControlScheduler::scheduleOverride(time_t startTime, time_t endTime, u_int8_t valueOverride) {
+    this->overrideStartTime = startTime;
+    this->overrideEndTime = endTime;
+    this->overrideValue = valueOverride;
+}
+
+void SpaControlScheduler::cancelOverride() {
+    scheduleOverride(now(), now(), SCHEDULER_DISABLED_VALUE);
+}
+
+bool SpaControlScheduler::isScheduleEnabled() {
+    return isNormalScheduleEnabled() || isOverrideScheduleEnabled();
+}
+
+u_int8_t SpaControlScheduler::getScheduledValue() {
+    if (isOverrideScheduleEnabled()) {
+        return overrideValue;
+    }
+    if (isNormalScheduleEnabled()) {
+        // calculate percentage
+
+        // Percentage of each on and off segment:
+        float onLengthPercentage = percentageOfDayOnTime / numberOfTimesToRun;
+        float offLengthPercentage = (100 - percentageOfDayOnTime) / numberOfTimesToRun;
+
+        // which segment are we in currently?
+        float currentPercentageOfDay = 100 * elapsedSecsToday(now()) / SECS_PER_DAY;
+
+        for (u_int8_t index = 1; index <= numberOfTimesToRun; index++) {
+            if ((onLengthPercentage * index) > currentPercentageOfDay) {
+                return normalValueOn;
+            } else if ((onLengthPercentage * index + offLengthPercentage * index) > currentPercentageOfDay) {
+                return normalValueOff;
+            }
+        }
+    }
+
+    return SCHEDULER_DISABLED_VALUE;
+}
+
+bool SpaControlScheduler::isNormalScheduleEnabled() {
+    return (percentageOfDayOnTime > 0 && numberOfTimesToRun > 0 && normalValueOn != SCHEDULER_DISABLED_VALUE &&
+            normalValueOff != SCHEDULER_DISABLED_VALUE);
+}
+
+bool SpaControlScheduler::isOverrideScheduleEnabled() {
+    return (overrideStartTime <= now() && overrideEndTime > now() && overrideValue != SCHEDULER_DISABLED_VALUE);
+}
+
 /*** SpaControl ***/
-
-
 SpaControl::SpaControl(const char *name, const char *type) {
     this->name = name;
     this->type = type;
@@ -51,7 +108,8 @@ void SimpleSpaControl::applyOutputs() {
     digitalWrite(pin, value ? HIGH : LOW);
 }
 
-TwoSpeedSpaControl::TwoSpeedSpaControl(const char *name, u_int8_t pin_power, u_int8_t pin_speed) : SpaControl(name, "off-low-high") {
+TwoSpeedSpaControl::TwoSpeedSpaControl(const char *name, u_int8_t pin_power, u_int8_t pin_speed) : SpaControl(name,
+                                                                                                              "off-low-high") {
     this->power = new SimpleSpaControl(name, pin_power);
     this->speed = new SimpleSpaControl(name, pin_speed);
     this->max = 2; // 0,1,2 - off/low/high
