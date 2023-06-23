@@ -67,6 +67,12 @@ public:
     bool isOverrideScheduleEnabled();
 
     /**
+     *
+     * @return remaining seconds or 0 if not in override mode
+     */
+    time_t getOverrideScheduleRemainingTime();
+
+    /**
      * @return scheduled value if schedule is enabled
      * If override is enabled, returns overrideValue
      * Returns normalValueOn or normalValueOff otherwise
@@ -85,6 +91,10 @@ private:
     time_t overrideEndTime = now();
     u_int8_t overrideValue = SCHEDULER_DISABLED_VALUE;
 
+    // For normal schedule math:
+    // These are normally set by calling normalSchedule():
+    float onOffLengthPercentage = 100; //defaults based on values of variables above (always off)
+    float onVsOff = 0; //defaults based on values of variables above (always off)
 };
 
 class SpaControl : public SpaControlScheduler {

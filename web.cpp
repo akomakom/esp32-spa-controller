@@ -79,11 +79,22 @@ const char *WEBPAGE_CONTROLS = R"(
                         });
                     }
 
-                    $('button.spacontrol').each(function () {
+          git remote add origin git@github.com:akomakom/esp32-spa-controller.git          $('button.spacontrol').each(function () {
                         let button = $(this);
                         let name = button.attr('name');
-                        button.attr('value', data.controls[name]['value']);
-                        button.text(name + "(" + data.controls[name]['value'] + ") "); //space for C R syntax
+                        let controlState = data.controls[name];
+                        button.attr('value', controlState['value']);
+                        let text = name;
+                        let valNames = ["OFF", "ON"];
+                        if (controlState['type'] ==  'off-low-high') {
+                            valNames ["OFF", "LOW", "HIGH"];
+                        }
+                        text += " (" + valNames[controlState['value']] + ") "; // space before " for C++ R() syntax
+
+                        if (controlState['ORT'] > 0) {
+                            text += " " + controlState['ORT'];
+                        }
+                        button.text(text);
                     })
                 });
             };

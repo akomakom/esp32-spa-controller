@@ -11,6 +11,13 @@ SpaControlScheduler::normalSchedule(u_int8_t percentageOfDayOnTime, u_int8_t num
     this->numberOfTimesToRun = std::max(1, (int)numberOfTimesToRun);
     this->normalValueOn = normalValueOn;
     this->normalValueOff = normalValueOff;
+
+    // precalculate normal schedule variables
+    float onLengthPercentage = (float)percentageOfDayOnTime / (float)numberOfTimesToRun;
+    float offLengthPercentage = (float)(100 - percentageOfDayOnTime) / (float)numberOfTimesToRun;
+    onOffLengthPercentage = onLengthPercentage + offLengthPercentage;
+    // how ON compares with OFF (how far is the divider), as a 0-1 fraction, <0.5 is on, >0.5 is off
+    onVsOff = onLengthPercentage / onOffLengthPercentage;
 }
 
 void SpaControlScheduler::scheduleOverride(time_t startTime, time_t endTime, u_int8_t valueOverride) {
@@ -33,17 +40,13 @@ u_int8_t SpaControlScheduler::getScheduledValue() {
     // Percentage of each on and off segment:
     // TODO: precalculate on normalSchedule() call
     // length of each unit as a percentage of day length
-    float onLengthPercentage = (float)percentageOfDayOnTime / (float)numberOfTimesToRun;
-    float offLengthPercentage = (float)(100 - percentageOfDayOnTime) / (float)numberOfTimesToRun;
-    float onOffLengthPercentage = onLengthPercentage + offLengthPercentage;
-    // how ON compares with OFF (how far is the divider), as a 0-1 fraction, <0.5 is on, >0.5 is off
-    float onVsOff = onLengthPercentage / onOffLengthPercentage;
 
-    // How far are we into the day, in percentages?
+    // How far are we into the day (since midnight), in percentages?
     float currentPercentageOfDay = (float)100 * elapsedSecsToday(now()) / SECS_PER_DAY;
     // which segment are we in currently?
     // how many on+off time units into the day are we?
-    float onOffUnitCount = currentPercentageOfDay / onOffLengthPercentage; // eg we are 2.36 on/off segments in
+    // eg we are 2.36 on/off segments into the day
+    float onOffUnitCount = currentPercentageOfDay / onOffLengthPercentage;
     float fractionOfOnOffUnit =  onOffUnitCount-(long)onOffUnitCount; //leave fraction only, eg 0.36
 
     // Are we past the on->off divider in this on-then-off time unit?
@@ -51,7 +54,14 @@ u_int8_t SpaControlScheduler::getScheduledValue() {
 }
 
 bool SpaControlScheduler::isOverrideScheduleEnabled() {
-    return (overrideStartTime <= now() && overrideEndTime > now() && overrideValue != SCHEDULER_DISABLED_VALUE);
+    return (getOverrideScheduleRemainingTime() > 0 && overrideValue != SCHEDULER_DISABLED_VALUE);
+}
+
+time_t SpaControlScheduler::getOverrideScheduleRemainingTime() {
+    if (overrideStartTime <= now()) {
+        return std::max((time_t)0, overrideEndTime - now());
+    }
+    return 0;
 }
 
 /*** SpaControl ***/
@@ -153,6 +163,7 @@ void SpaStatus::updateStatusString() {
         control->jsonStatus["min"] = control->min;
         control->jsonStatus["max"] = control->max;
         control->jsonStatus["type"] = control->type;
+        control->jsonStatus["ORT"] = control->getOverrideScheduleRemainingTime();
     }
 
     jsonStatusMetrics["temp"] = 100;
