@@ -16,6 +16,9 @@ This is work-in-progress.
 * Sheduling on/off behavior
 * Overriding said schedule briefly (eg pump to high for 20 minutes)
 * Overriding said schedule in the future (eg heater up 10 degrees for the weekend)
+* Web UI 
+* Touchscreen UI using wireless display/ESP32 boards via ESP-NOW protocol
+* OTA updates
 
 ### Hardware design
 
