@@ -11,7 +11,7 @@
 #include <TimeAlarms.h>
 
 // needs to be large enough to allocate json document and string representation
-#define STATUS_LENGTH 400
+#define STATUS_LENGTH 500
 
 // 8 channel relay ESP32-WROOM module from China:
 const int RELAY_PIN_1 = 32;
@@ -24,7 +24,21 @@ const int RELAY_PIN_7 = 12;
 const int RELAY_PIN_8 = 13;
 const int LED_PIN = 23;
 
-
+/**
+ * A Scheduler that can be attached to any control
+ * A control will consult the scheduler to see if the value should be schedule-based
+ *
+ * Scheduler supports two types of automation:
+ * 1) Normal: On for a certain percentage of the day, every day.
+ * 2) Override: Temporarily override the normal schedule (whether one is set or not), one time, for a set duration.
+ *
+ * For example, 2-speed pump scheduler:
+ * - Pump on low for 50% of the day, in 5 segments = 10% on, 10% off, all day (2.4 hours on, 2.4 hours off):
+ *      normalSchedule(50, 5, 1, 0);
+ * - Override: someone pushed the Boost button (high speed): High Speed for 20 minutes, then back to above:
+ *      scheduleOverride(now(), now() + 20 * SECS_PER_MIN, 2)
+ *
+ */
 class SpaControlScheduler {
 public:
 
@@ -47,35 +61,33 @@ public:
 
     void cancelOverride();
     /**
-     * @return true if a schedule is in effect, whether normal or override
+     *
+     * @return true if override schedule (specifically) is in effect
      */
-    bool isScheduleEnabled();
+    bool isOverrideScheduleEnabled();
 
     /**
-     * @return scheduled value if schedule is enabled (see isScheduleEnabled)
+     * @return scheduled value if schedule is enabled
      * If override is enabled, returns overrideValue
-     * if only normal schedule is enabled, returns normalValueOn or normalValueOff
-     * If neither is enabled, returns SCHEDULER_DISABLED_VALUE
+     * Returns normalValueOn or normalValueOff otherwise
      */
     u_int8_t getScheduledValue();
 
 private:
     static const u_int8_t SCHEDULER_DISABLED_VALUE = -1;
-    u_int8_t percentageOfDayOnTime = SCHEDULER_DISABLED_VALUE;
-    u_int8_t numberOfTimesToRun = SCHEDULER_DISABLED_VALUE;
-    u_int8_t normalValueOn = SCHEDULER_DISABLED_VALUE;
-    u_int8_t normalValueOff = SCHEDULER_DISABLED_VALUE;
+    // default is always off:
+    u_int8_t percentageOfDayOnTime = 0;
+    u_int8_t numberOfTimesToRun = 1; // stay on
+    u_int8_t normalValueOn = 1;
+    u_int8_t normalValueOff = 0;
 
-    u_int8_t overrideStartTime = now();
-    u_int8_t overrideEndTime = now();
+    time_t overrideStartTime = now();
+    time_t overrideEndTime = now();
     u_int8_t overrideValue = SCHEDULER_DISABLED_VALUE;
-
-    bool isNormalScheduleEnabled();
-    bool isOverrideScheduleEnabled();
 
 };
 
-class SpaControl {
+class SpaControl : public SpaControlScheduler {
     const int DEFAULT_MIN = 0;
     const int DEFAULT_MAX = 1;
 public:
@@ -83,7 +95,19 @@ public:
 
     virtual void toggle();
 
+    /**
+     * Change the local (not scheduler) value.
+     * There may be a scheduler on the control that can override this value
+     * Changing that value should be done via the scheduler instance
+     * @param value
+     */
     virtual void set(u_int8_t value);
+
+    /**
+     *
+     * @return either this->value or this->scheduler value if scheduler is in effect
+     */
+    virtual u_int8_t getEffectiveValue();
 
     virtual void applyOutputs();
 
@@ -91,14 +115,13 @@ public:
     u_int8_t min = DEFAULT_MIN;
     u_int8_t max = DEFAULT_MAX;
     const char *type;
-    u_int8_t value = 0;
     JsonObject jsonStatus;
 
 private:
     void init(const char *name, u_int8_t min, u_int8_t max);
 
 protected:
-    void incrementValue();
+    u_int8_t getNextValue(); // helper for toggle()
 };
 
 class SimpleSpaControl : public SpaControl {
@@ -127,9 +150,8 @@ public:
 
     virtual void applyOutputs();
 
-private:
-    SimpleSpaControl *power;
-    SimpleSpaControl *speed;
+    u_int8_t pinPower;
+    u_int8_t pinSpeed;
 };
 
 class SpaStatus {
@@ -147,7 +169,6 @@ public:
     SpaControl *blower = new SimpleSpaControl("blower", RELAY_PIN_3);
     SpaControl *heater = new SimpleSpaControl("heater", RELAY_PIN_4);
     SpaControl *ozone = new SimpleSpaControl("ozone", RELAY_PIN_5);
-
 
     char statusString[STATUS_LENGTH];
 
