@@ -46,18 +46,27 @@ void setup(void) {
 
     server.on("/toggle", HTTP_POST, []() {
         const char *response = WEB_RESPONSE_OK;
-        Serial.print("Control passed is ");
-        Serial.print(server.arg("control"));
-
         try {
             spaStatus.findByName(server.arg("control").c_str())->toggle();
-            // Serial.print("With pin");
-            // Serial.println(spaStatus.findByName(server.arg("control").c_str())->pin);
             sendJSONResponse(WEB_RESPONSE_OK);
         } catch (std::invalid_argument &e) {
             sendJSONResponse(WEB_RESPONSE_FAIL, 500);
         }
     });
+    server.on("/override", HTTP_POST, []() {
+        const char *response = WEB_RESPONSE_OK;
+        try {
+            // seconds relative to current time
+            time_t start = now() + (time_t)server.arg("start").toInt();
+            time_t end   = now() + (time_t)server.arg("duration").toInt();
+            u_int8_t value = (u_int8_t)server.arg("value").toInt();
+            spaStatus.findByName(server.arg("control").c_str())->scheduleOverride(start, end, value);
+            sendJSONResponse(WEB_RESPONSE_OK);
+        } catch (std::invalid_argument &e) {
+            sendJSONResponse(WEB_RESPONSE_FAIL, 500);
+        }
+    });
+
 
     server.on("/", HTTP_GET, []() {
         sendHTMLResponse(WEBPAGE_CONTROLS);

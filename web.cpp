@@ -43,10 +43,91 @@ const char *WEBPAGE_CONTROLS = R"(
             top: 1px;
         }
 
+        .scheduler {
+            border: 1px solid grey;
+        }
+
+        #duration-dialog-form {
+            display: none;
+        }
+
     </style>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.13.2/themes/smoothness/jquery-ui.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js"></script>
     <script>
+
+        // https://stackoverflow.com/a/71184881/1735931
+        function secToTime(seconds, separator) {
+            return [
+                parseInt(seconds / 60 / 60),
+                parseInt(seconds / 60 % 60),
+                parseInt(seconds % 60)
+            ].join(separator ? separator : ':').replace(/\b(\d)\b/g, "0$1").replace(/^00\:/,'')
+        }
+
         $(document).ready(function() {
+
+             //TODO: get all this from server
+            let durationOptions = [0,1,2,3,4,5,10,15,20,30,45,60,120,240,480]
+
+            // saved state for override duration edit dialog:
+            let durationChoice = 20;
+            let controlName = '';
+            let controlValue = 0;
+
+            $.each(durationOptions, function(index, duration) {
+                let option = $('<button type="button"/>');
+                option.text(secToTime(duration))
+                    .attr('value', duration)
+                    .on('click', function() {
+                        durationChoice = duration;
+                        $.ajax({
+                            type: "POST",
+                            url: '/override',
+                            data: {
+                                control:  controlName,
+                                start: 0,
+                                duration: durationChoice * 60,
+                                value: controlValue,
+                            },
+                            success: function() {
+                                $(this).removeClass('error');
+                                updateStatus();
+                            },
+                            error: function () {
+                                $(this).addClass('error')
+                            },
+                            dataType: 'json'
+                        });
+                    });
+                $('#duration-options').append(option);
+            });
+
+
+            let durationChoiceHandler = function(event) {
+                controlName = $(this).attr('name');
+                controlValue = $(this).attr('value');
+
+                event.stopPropagation();
+                let durationChoice = 20;
+                dialog = $( "#duration-dialog-form" ).dialog({
+//                  autoOpen: false,
+                  height: 400,
+                  width: 350,
+                  modal: true,
+                  buttons: {
+                    'Close': function() {
+                        $(this).dialog('close');
+                    }
+                  },
+
+                  close: function() {
+
+                  }
+                });
+            }
+
             let toggleClickHandler = function() {
                 $.ajax({
                     type: "POST",
@@ -56,7 +137,6 @@ const char *WEBPAGE_CONTROLS = R"(
                         $(this).removeClass('error');
                         updateStatus();
                     },
-                    // SUCCESS WINDS UP HERE???
                     error: function () {
                         $(this).addClass('error')
                     },
@@ -65,36 +145,49 @@ const char *WEBPAGE_CONTROLS = R"(
             }
             let updateStatus = function () {
                 $.getJSON( "status", function( data ) {
-                    if ($('button.spacontrol').length == 0) {
+                    if ($('.spacontrol').length == 0) {
                         //first load, create controls
                         $.each(data.controls, function(name) {
-
-                            let button = $('<button type="button" class="spacontrol"></button>');
-                            button
+                            let control = $(`
+                                <div class="spacontrol">
+                                   <button type="button" class="control">
+                                       <span class="control-name"></span>
+                                       <span class="control-state"></span>
+                                   </button>
+                                   <button type="button" class="scheduler">
+                                       <span class="scheduler-on">&#9201;</span>
+                                       <span class="scheduler-ort"></span>
+                                   </button>
+                                 </div> `);
+                            control.find('.control')
+                                .on('click', toggleClickHandler)
                                 .attr('value', data.controls[name]['value'])
-                                .attr('name', name)
-                                .text(name)
-                                .on('click', toggleClickHandler);
-                            $('#spacontrols').append(button);
+                                .attr('name', name);
+                            control.find('.scheduler')
+                                .on('click', durationChoiceHandler)
+                                .attr('value', data.controls[name]['value'])
+                                .attr('name', name);
+                            $('#spacontrols').append(control);
                         });
                     }
 
-          git remote add origin git@github.com:akomakom/esp32-spa-controller.git          $('button.spacontrol').each(function () {
-                        let button = $(this);
-                        let name = button.attr('name');
+                    $('.spacontrol').each(function () {
+                        let control = $(this);
+                        let controlButton = control.find('.control');
+
+                        let name = controlButton.attr('name');
                         let controlState = data.controls[name];
-                        button.attr('value', controlState['value']);
-                        let text = name;
+
+                        control.find('.control').attr('value', controlState['value']);
+                        control.find('.scheduler').attr('value', controlState['value']);
                         let valNames = ["OFF", "ON"];
                         if (controlState['type'] ==  'off-low-high') {
-                            valNames ["OFF", "LOW", "HIGH"];
+                            valNames = ["OFF", "LOW", "HIGH"];
                         }
-                        text += " (" + valNames[controlState['value']] + ") "; // space before " for C++ R() syntax
-
-                        if (controlState['ORT'] > 0) {
-                            text += " " + controlState['ORT'];
-                        }
-                        button.text(text);
+                        control.find('.control-name').text(name);
+                        control.find('.control-state').text(valNames[controlState['value']]);
+                        control.find('.scheduler-ort').text(secToTime(controlState['ORT']));
+                        control.find('.scheduler').toggle(controlState['ORT'] > 0);
                     })
                 });
             };
@@ -107,6 +200,12 @@ const char *WEBPAGE_CONTROLS = R"(
 </head>
 <body>
     <div id="spacontrols">
+    </div>
+    <div id="duration-dialog-form" title="Select Duration">
+        Select how long this control should remain in this mode (Hours:Minutes)
+        <div id="duration-options">
+        </div>
+      </form>
     </div>
 </body>
 </html>
