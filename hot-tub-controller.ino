@@ -37,6 +37,7 @@ void setup(void) {
             delay(1000);
         }
     }
+    SPIFFS.begin();
     Serial.println("mDNS responder started");
 
     server.on("/status", HTTP_GET, []() {
@@ -65,11 +66,6 @@ void setup(void) {
         } catch (std::invalid_argument &e) {
             sendJSONResponse(WEB_RESPONSE_FAIL, 500);
         }
-    });
-
-
-    server.on("/", HTTP_GET, []() {
-        sendHTMLResponse(WEBPAGE_CONTROLS);
     });
 
     setupServerDefaultActions();

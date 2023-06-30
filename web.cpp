@@ -4,214 +4,6 @@
 const char *WEB_RESPONSE_OK = R"({ "success": true })";
 const char *WEB_RESPONSE_FAIL = R"({ "success": false })";
 
-// ensure there are no )" sequences in quoted text:
-const char *WEBPAGE_CONTROLS = R"(
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Control</title>
-    <style>
-        .error {
-            color: red;
-        }
-
-        .spacontrol {
-            box-shadow: 1px 1px 4px 1px #8dcbe6;
-            background: linear-gradient(to bottom, #33bdef 5%, #019ad2 100%);
-            background-color: #33bdef;
-            border-radius: 9px;
-            border: 3px solid #057fd0;
-            display: inline-block;
-            cursor: pointer;
-            color: #ffffff;
-            font-family: Arial;
-            font-size: 28px;
-            font-weight: bold;
-            padding: 15px 51px;
-            text-decoration: none;
-            text-shadow: 0px -1px 0px #5b6178;
-        }
-
-        .spacontrol:hover {
-            background: linear-gradient(to bottom, #019ad2 5%, #33bdef 100%);
-            background-color: #019ad2;
-        }
-
-        .spacontrol:active {
-            position: relative;
-            top: 1px;
-        }
-
-        .scheduler {
-            border: 1px solid grey;
-        }
-
-        #duration-dialog-form {
-            display: none;
-        }
-
-    </style>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
-    <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.13.2/themes/smoothness/jquery-ui.css">
-    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js"></script>
-    <script>
-
-        // https://stackoverflow.com/a/71184881/1735931
-        function secToTime(seconds, separator) {
-            return [
-                parseInt(seconds / 60 / 60),
-                parseInt(seconds / 60 % 60),
-                parseInt(seconds % 60)
-            ].join(separator ? separator : ':').replace(/\b(\d)\b/g, "0$1").replace(/^00\:/,'')
-        }
-
-        $(document).ready(function() {
-
-             //TODO: get all this from server
-            let durationOptions = [0,1,2,3,4,5,10,15,20,30,45,60,120,240,480]
-
-            // saved state for override duration edit dialog:
-            let durationChoice = 20;
-            let controlName = '';
-            let controlValue = 0;
-
-            $.each(durationOptions, function(index, duration) {
-                let option = $('<button type="button"/>');
-                option.text(secToTime(duration))
-                    .attr('value', duration)
-                    .on('click', function() {
-                        durationChoice = duration;
-                        $.ajax({
-                            type: "POST",
-                            url: '/override',
-                            data: {
-                                control:  controlName,
-                                start: 0,
-                                duration: durationChoice * 60,
-                                value: controlValue,
-                            },
-                            success: function() {
-                                $(this).removeClass('error');
-                                updateStatus();
-                            },
-                            error: function () {
-                                $(this).addClass('error')
-                            },
-                            dataType: 'json'
-                        });
-                    });
-                $('#duration-options').append(option);
-            });
-
-
-            let durationChoiceHandler = function(event) {
-                controlName = $(this).attr('name');
-                controlValue = $(this).attr('value');
-
-                event.stopPropagation();
-                let durationChoice = 20;
-                dialog = $( "#duration-dialog-form" ).dialog({
-//                  autoOpen: false,
-                  height: 400,
-                  width: 350,
-                  modal: true,
-                  buttons: {
-                    'Close': function() {
-                        $(this).dialog('close');
-                    }
-                  },
-
-                  close: function() {
-
-                  }
-                });
-            }
-
-            let toggleClickHandler = function() {
-                $.ajax({
-                    type: "POST",
-                    url: '/toggle',
-                    data: { control:  $(this).attr('name') },
-                    success: function() {
-                        $(this).removeClass('error');
-                        updateStatus();
-                    },
-                    error: function () {
-                        $(this).addClass('error')
-                    },
-                    dataType: 'json'
-                });
-            }
-            let updateStatus = function () {
-                $.getJSON( "status", function( data ) {
-                    if ($('.spacontrol').length == 0) {
-                        //first load, create controls
-                        $.each(data.controls, function(name) {
-                            let control = $(`
-                                <div class="spacontrol">
-                                   <button type="button" class="control">
-                                       <span class="control-name"></span>
-                                       <span class="control-state"></span>
-                                   </button>
-                                   <button type="button" class="scheduler">
-                                       <span class="scheduler-on">&#9201;</span>
-                                       <span class="scheduler-ort"></span>
-                                   </button>
-                                 </div> `);
-                            control.find('.control')
-                                .on('click', toggleClickHandler)
-                                .attr('value', data.controls[name]['value'])
-                                .attr('name', name);
-                            control.find('.scheduler')
-                                .on('click', durationChoiceHandler)
-                                .attr('value', data.controls[name]['value'])
-                                .attr('name', name);
-                            $('#spacontrols').append(control);
-                        });
-                    }
-
-                    $('.spacontrol').each(function () {
-                        let control = $(this);
-                        let controlButton = control.find('.control');
-
-                        let name = controlButton.attr('name');
-                        let controlState = data.controls[name];
-
-                        control.find('.control').attr('value', controlState['value']);
-                        control.find('.scheduler').attr('value', controlState['value']);
-                        let valNames = ["OFF", "ON"];
-                        if (controlState['type'] ==  'off-low-high') {
-                            valNames = ["OFF", "LOW", "HIGH"];
-                        }
-                        control.find('.control-name').text(name);
-                        control.find('.control-state').text(valNames[controlState['value']]);
-                        control.find('.scheduler-ort').text(secToTime(controlState['ORT']));
-                        control.find('.scheduler').toggle(controlState['ORT'] > 0);
-                    })
-                });
-            };
-
-            updateStatus();
-            setInterval(updateStatus, 5000);
-        });
-
-    </script>
-</head>
-<body>
-    <div id="spacontrols">
-    </div>
-    <div id="duration-dialog-form" title="Select Duration">
-        Select how long this control should remain in this mode (Hours:Minutes)
-        <div id="duration-options">
-        </div>
-      </form>
-    </div>
-</body>
-</html>
-)";
-
-
 /*
  * Login page
  */
@@ -299,6 +91,8 @@ const char *WEBPAGE_UPDATE =
         "});"
         "</script>";
 
+//holds the current upload
+File fsUploadFile;
 
 void sendJSONResponse(const char *content) {
     sendJSONResponse(content, 200);
@@ -312,6 +106,168 @@ void sendJSONResponse(const char *content, int code) {
 void sendHTMLResponse(const char *content) {
     server.sendHeader("Connection", "close");
     server.send(200, "text/html", content);
+}
+
+void returnFail(String msg) {
+    server.send(500, "text/plain", msg + "\r\n");
+}
+
+String getContentType(String filename){
+    if(server.hasArg("download")) return "application/octet-stream";
+    else if(filename.endsWith(".htm")) return "text/html";
+    else if(filename.endsWith(".html")) return "text/html";
+    else if(filename.endsWith(".css")) return "text/css";
+    else if(filename.endsWith(".js")) return "application/javascript";
+    else if(filename.endsWith(".png")) return "image/png";
+    else if(filename.endsWith(".gif")) return "image/gif";
+    else if(filename.endsWith(".jpg")) return "image/jpeg";
+    else if(filename.endsWith(".ico")) return "image/x-icon";
+    else if(filename.endsWith(".xml")) return "text/xml";
+    else if(filename.endsWith(".pdf")) return "application/x-pdf";
+    else if(filename.endsWith(".zip")) return "application/x-zip";
+    else if(filename.endsWith(".gz")) return "application/x-gzip";
+    return "text/plain";
+}
+
+bool handleFileRead(String path){
+    Serial.println("handleFileRead: " + path);
+    if(path.endsWith("/")) path += "index.html";
+    String contentType = getContentType(path);
+    String pathWithGz = path + ".gz";
+    if(SPIFFS.exists(pathWithGz) || SPIFFS.exists(path)){
+        if(SPIFFS.exists(pathWithGz))
+            path += ".gz";
+        File file = SPIFFS.open(path, "r");
+        size_t sent = server.streamFile(file, contentType);
+        file.close();
+        return true;
+    }
+    return false;
+}
+
+void handleFileUpload(){
+    if(server.uri() != "/edit") return;
+    HTTPUpload& upload = server.upload();
+    if(upload.status == UPLOAD_FILE_START){
+        String filename = upload.filename;
+        if(!filename.startsWith("/")) filename = "/"+filename;
+        DBG_OUTPUT_PORT.print("handleFileUpload Name: "); DBG_OUTPUT_PORT.println(filename);
+        fsUploadFile = SPIFFS.open(filename, "w");
+        filename = String();
+    } else if(upload.status == UPLOAD_FILE_WRITE){
+        //DBG_OUTPUT_PORT.print("handleFileUpload Data: "); DBG_OUTPUT_PORT.println(upload.currentSize);
+        if(fsUploadFile)
+            fsUploadFile.write(upload.buf, upload.currentSize);
+    } else if(upload.status == UPLOAD_FILE_END){
+        if(fsUploadFile)
+            fsUploadFile.close();
+        DBG_OUTPUT_PORT.print("handleFileUpload Size: "); DBG_OUTPUT_PORT.println(upload.totalSize);
+    }
+}
+
+void handleFileDelete(){
+    if(server.args() == 0) return server.send(500, "text/plain", "BAD ARGS");
+    String path = server.arg(0);
+    DBG_OUTPUT_PORT.println("handleFileDelete: " + path);
+    if(path == "/")
+        return server.send(500, "text/plain", "BAD PATH");
+    if(!SPIFFS.exists(path))
+        return server.send(404, "text/plain", "FileNotFound");
+    SPIFFS.remove(path);
+    server.send(200, "text/plain", "");
+    path = String();
+}
+
+void handleFileCreate(){
+    if(server.args() == 0)
+        return server.send(500, "text/plain", "BAD ARGS");
+    String path = server.arg(0);
+    DBG_OUTPUT_PORT.println("handleFileCreate: " + path);
+    if(path == "/")
+        return server.send(500, "text/plain", "BAD PATH");
+    if(SPIFFS.exists(path))
+        return server.send(500, "text/plain", "FILE EXISTS");
+    File file = SPIFFS.open(path, "w");
+    if(file)
+        file.close();
+    else
+        return server.send(500, "text/plain", "CREATE FAILED");
+    server.send(200, "text/plain", "");
+    path = String();
+}
+
+void handleFileList() {
+    if(!server.hasArg("dir")) {
+        returnFail("BAD ARGS");
+        return;
+    }
+    String path = server.arg("dir");
+    if(path != "/" && !SPIFFS.exists((char *)path.c_str())) {
+        returnFail("BAD PATH");
+        return;
+    }
+    File dir = SPIFFS.open((char *)path.c_str());
+    path = String();
+    if(!dir.isDirectory()){
+        dir.close();
+        returnFail("NOT DIR");
+        return;
+    }
+    dir.rewindDirectory();
+
+    String output = "[";
+    for (int cnt = 0; true; ++cnt) {
+        File entry = dir.openNextFile();
+        if (!entry)
+            break;
+
+        if (cnt > 0)
+            output += ',';
+
+        output += "{\"type\":\"";
+        output += (entry.isDirectory()) ? "dir" : "file";
+        output += "\",\"name\":\"";
+        // Ignore '/' prefix
+//        output += entry.name()+1;
+        output += entry.name();
+        output += "\"";
+        output += "}";
+        entry.close();
+    }
+    output += "]";
+    server.send(200, "text/json", output);
+    dir.close();
+}
+
+void listDir(fs::FS &fs, const char * dirname, uint8_t levels) {
+    DBG_OUTPUT_PORT.printf("Listing directory: %s\n", dirname);
+
+    File root = fs.open(dirname);
+    if (!root) {
+        DBG_OUTPUT_PORT.println("Failed to open directory");
+        return;
+    }
+    if (!root.isDirectory()) {
+        DBG_OUTPUT_PORT.println("Not a directory");
+        return;
+    }
+
+    File file = root.openNextFile();
+    while (file) {
+        if (file.isDirectory()) {
+            DBG_OUTPUT_PORT.print("  DIR : ");
+            DBG_OUTPUT_PORT.println(file.name());
+            if (levels) {
+                listDir(fs, file.name(), levels - 1);
+            }
+        } else {
+            DBG_OUTPUT_PORT.print("  FILE: ");
+            DBG_OUTPUT_PORT.print(file.name());
+            DBG_OUTPUT_PORT.print("  SIZE: ");
+            DBG_OUTPUT_PORT.println(file.size());
+        }
+        file = root.openNextFile();
+    }
 }
 
 void setupServerDefaultActions() {
@@ -346,7 +302,31 @@ void setupServerDefaultActions() {
             }
         }
     });
+
+    //load editor
+    server.on("/edit", HTTP_GET, [](){
+        if(!handleFileRead("/edit.htm")) server.send(404, "text/plain", "FileNotFound");
+    });
+    //create file
+    server.on("/edit", HTTP_PUT, handleFileCreate);
+    //delete file
+    server.on("/edit", HTTP_DELETE, handleFileDelete);
+    //first callback is called after the request has ended with all parsed arguments
+    //second callback handles file uploads at that location
+    server.on("/edit", HTTP_POST, [](){ server.send(200, "text/plain", ""); }, handleFileUpload);
+
+
+    server.on("/list", HTTP_GET, handleFileList);
+
+    //called when the url is not defined here
+    //use it to load content from SPIFFS
+    server.onNotFound([](){
+        if(!handleFileRead(server.uri()))
+            server.send(404, "text/plain", "FileNotFound");
+    });
 }
+
+
 
 
 WebServer server(80);

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Control</title>
+  <style>
+    .error {
+      color: red;
+    }
+
+    .spacontrol {
+      box-shadow: 1px 1px 4px 1px #8dcbe6;
+      background: linear-gradient(to bottom, #33bdef 5%, #019ad2 100%);
+      background-color: #33bdef;
+      border-radius: 9px;
+      border: 3px solid #057fd0;
+      display: inline-block;
+      cursor: pointer;
+      color: #ffffff;
+      font-family: Arial;
+      font-size: 28px;
+      font-weight: bold;
+      padding: 15px 51px;
+      text-decoration: none;
+      text-shadow: 0px -1px 0px #5b6178;
+    }
+
+    .spacontrol:hover {
+      background: linear-gradient(to bottom, #019ad2 5%, #33bdef 100%);
+      background-color: #019ad2;
+    }
+
+    .spacontrol:active {
+      position: relative;
+      top: 1px;
+    }
+
+    .scheduler {
+      border: 1px solid grey;
+    }
+
+    #duration-dialog-form {
+      display: none;
+    }
+
+  </style>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
+  <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.13.2/themes/smoothness/jquery-ui.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js"></script>
+  <script>
+
+    // https://stackoverflow.com/a/71184881/1735931
+    function secToTime(seconds, separator) {
+      return [
+        parseInt(seconds / 60 / 60),
+        parseInt(seconds / 60 % 60),
+        parseInt(seconds % 60)
+      ].join(separator ? separator : ':').replace(/\b(\d)\b/g, "0$1").replace(/^00\:/,'')
+    }
+
+    $(document).ready(function() {
+
+      //TODO: get all this from server
+      let durationOptions = [0,1,2,3,4,5,10,15,20,30,45,60,120,240,480]
+
+      // saved state for override duration edit dialog:
+      let durationChoice = 20;
+      let controlName = '';
+      let controlValue = 0;
+
+      $.each(durationOptions, function(index, duration) {
+        let option = $('<button type="button"/>');
+        option.text(secToTime(duration))
+                .attr('value', duration)
+                .on('click', function() {
+                  durationChoice = duration;
+                  $.ajax({
+                    type: "POST",
+                    url: '/override',
+                    data: {
+                      control:  controlName,
+                      start: 0,
+                      duration: durationChoice * 60,
+                      value: controlValue,
+                    },
+                    success: function() {
+                      $(this).removeClass('error');
+                      updateStatus();
+                    },
+                    error: function () {
+                      $(this).addClass('error')
+                    },
+                    dataType: 'json'
+                  });
+                });
+        $('#duration-options').append(option);
+      });
+
+
+      let durationChoiceHandler = function(event) {
+        controlName = $(this).attr('name');
+        controlValue = $(this).attr('value');
+
+        event.stopPropagation();
+        let durationChoice = 20;
+        dialog = $( "#duration-dialog-form" ).dialog({
+//                  autoOpen: false,
+          height: 400,
+          width: 350,
+          modal: true,
+          buttons: {
+            'Close': function() {
+              $(this).dialog('close');
+            }
+          },
+
+          close: function() {
+
+          }
+        });
+      }
+
+      let toggleClickHandler = function() {
+        $.ajax({
+          type: "POST",
+          url: '/toggle',
+          data: { control:  $(this).attr('name') },
+          success: function() {
+            $(this).removeClass('error');
+            updateStatus();
+          },
+          error: function () {
+            $(this).addClass('error')
+          },
+          dataType: 'json'
+        });
+      }
+      let updateStatus = function () {
+        $.getJSON( "status", function( data ) {
+          if ($('.spacontrol').length == 0) {
+            //first load, create controls
+            $.each(data.controls, function(name) {
+              let control = $(`
+                <div class="spacontrol">
+                   <span class="control-name"></span>
+                   <button type="button" class="control">
+                       <span class="control-state"></span>
+                   </button>
+                   <button type="button" class="scheduler">
+                       <span class="scheduler-on">&#9201;</span>
+                       <span class="scheduler-ort"></span>
+                   </button>
+                 </div> `);
+              control.find('.control')
+                      .on('click', toggleClickHandler)
+                      .attr('value', data.controls[name]['value'])
+                      .attr('name', name);
+              control.find('.scheduler')
+                      .on('click', durationChoiceHandler)
+                      .attr('value', data.controls[name]['value'])
+                      .attr('name', name);
+              $('#spacontrols').append(control);
+            });
+          }
+
+          $('.spacontrol').each(function () {
+            let control = $(this);
+            let controlButton = control.find('.control');
+
+            let name = controlButton.attr('name');
+            let controlState = data.controls[name];
+
+            control.find('.control').attr('value', controlState['value']);
+            control.find('.scheduler').attr('value', controlState['value']);
+            let valNames = ["OFF", "ON"];
+            if (controlState['type'] ==  'off-low-high') {
+              valNames = ["OFF", "LOW", "HIGH"];
+            }
+            control.find('.control-name').text(name);
+            control.find('.control-state').text(valNames[controlState['value']]);
+            control.find('.scheduler-ort').text(secToTime(controlState['ORT']));
+            control.find('.scheduler').toggle(controlState['ORT'] > 0);
+          })
+        });
+      };
+
+      updateStatus();
+      setInterval(updateStatus, 5000);
+    });
+
+  </script>
+</head>
+<body>
+<div id="spacontrols">
+</div>
+<div id="duration-dialog-form" title="Select Duration">
+  Please select how long this control should remain in this mode (Hours:Minutes)
+  <div id="duration-options">
+  </div>
+  </form>
+</div>
+</body>
+</html>

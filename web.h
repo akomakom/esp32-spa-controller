@@ -3,12 +3,13 @@
 
 #include <WebServer.h>
 #include <Update.h>
+#include <SPIFFS.h>
 
+#define DBG_OUTPUT_PORT Serial
 
 extern const char *WEB_RESPONSE_OK;
 extern const char *WEB_RESPONSE_FAIL;
 
-extern const char *WEBPAGE_CONTROLS;
 extern const char *WEBPAGE_LOGIN;
 extern const char *WEBPAGE_UPDATE;
 
