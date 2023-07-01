@@ -153,12 +153,13 @@ void TwoSpeedSpaControl::applyOutputs() {
 SpaStatus::SpaStatus() {
     pump->normalSchedule(50, 2, 1, 0); //temporary for experiments
     for (SpaControl *control: controls) {
-        control->jsonStatus = jsonStatusControls.createNestedObject(control->name);
+        control->jsonStatus = jsonStatusControls.createNestedObject();
     }
 }
 
 void SpaStatus::updateStatusString() {
     for (SpaControl *control: controls) {
+        control->jsonStatus["name"] = control->name;
         control->jsonStatus["value"] = control->getEffectiveValue();
         control->jsonStatus["min"] = control->min;
         control->jsonStatus["max"] = control->max;
@@ -178,7 +179,10 @@ SpaControl *SpaStatus::findByName(const char *name) {
     }
     Serial.println("No control found with name: ");
     Serial.println(name);
-    throw std::invalid_argument("Control not found with this name");
+
+    char buffer [200];
+    sprintf(buffer, "Control not found with name : %s", name);
+    throw std::invalid_argument(buffer);
 }
 
 void SpaStatus::applyControls() {

@@ -167,7 +167,7 @@ public:
 class SpaStatus {
 private:
     StaticJsonDocument<STATUS_LENGTH> jsonStatus;
-    JsonObject jsonStatusControls = jsonStatus.createNestedObject("controls");
+    JsonArray jsonStatusControls = jsonStatus.createNestedArray("controls");
     JsonObject jsonStatusMetrics = jsonStatus.createNestedObject("metrics");
 
 public:

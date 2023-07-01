@@ -51,7 +51,7 @@ void setup(void) {
             spaStatus.findByName(server.arg("control").c_str())->toggle();
             sendJSONResponse(WEB_RESPONSE_OK);
         } catch (std::invalid_argument &e) {
-            sendJSONResponse(WEB_RESPONSE_FAIL, 500);
+            sendJSONResponse(e.what(), 500);
         }
     });
     server.on("/override", HTTP_POST, []() {
@@ -64,7 +64,7 @@ void setup(void) {
             spaStatus.findByName(server.arg("control").c_str())->scheduleOverride(start, end, value);
             sendJSONResponse(WEB_RESPONSE_OK);
         } catch (std::invalid_argument &e) {
-            sendJSONResponse(WEB_RESPONSE_FAIL, 500);
+            sendJSONResponse(e.what(), 500);
         }
     });
 

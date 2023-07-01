@@ -137,50 +137,42 @@
       }
       let updateStatus = function () {
         $.getJSON( "status", function( data ) {
-          if ($('.spacontrol').length == 0) {
-            //first load, create controls
-            $.each(data.controls, function(name) {
-              let control = $(`
-                <div class="spacontrol">
-                   <span class="control-name"></span>
-                   <button type="button" class="control">
-                       <span class="control-state"></span>
-                   </button>
-                   <button type="button" class="scheduler">
-                       <span class="scheduler-on">&#9201;</span>
-                       <span class="scheduler-ort"></span>
-                   </button>
-                 </div> `);
-              control.find('.control')
-                      .on('click', toggleClickHandler)
-                      .attr('value', data.controls[name]['value'])
-                      .attr('name', name);
-              control.find('.scheduler')
-                      .on('click', durationChoiceHandler)
-                      .attr('value', data.controls[name]['value'])
-                      .attr('name', name);
-              $('#spacontrols').append(control);
-            });
-          }
 
-          $('.spacontrol').each(function () {
-            let control = $(this);
+
+          $.each(data.controls, function(index, controlData) {
+            let control  = $(`#spacontrols .spacontrol[name="${controlData['name']}"]`);
             let controlButton = control.find('.control');
+            let scheduler = control.find('.scheduler');
 
-            let name = controlButton.attr('name');
-            let controlState = data.controls[name];
+            if (control.length == 0) {
+              //first load, create controls
+              control = $('#templates .spacontrol').clone().attr('name', controlData['name']);
+              controlButton = control.find('.control')
+                      .on('click', toggleClickHandler)
+                      .attr('value', controlData['value'])
+                      .attr('name', controlData['name']);
+              scheduler = control.find('.scheduler')
+                      .on('click', durationChoiceHandler)
+                      .attr('value', controlData['value'])
+                      .attr('name', controlData['name']);
+              control.data('status', controlData);
 
-            control.find('.control').attr('value', controlState['value']);
-            control.find('.scheduler').attr('value', controlState['value']);
+            }
+            $('#spacontrols').append(control);
+
+            controlButton.attr('value', controlData['value']);
+            scheduler.attr('value', controlData['value']);
             let valNames = ["OFF", "ON"];
-            if (controlState['type'] ==  'off-low-high') {
+            if (controlData['type'] ==  'off-low-high') {
               valNames = ["OFF", "LOW", "HIGH"];
             }
-            control.find('.control-name').text(name);
-            control.find('.control-state').text(valNames[controlState['value']]);
-            control.find('.scheduler-ort').text(secToTime(controlState['ORT']));
-            control.find('.scheduler').toggle(controlState['ORT'] > 0);
-          })
+            control.find('.control-name').text(controlData['name']);
+            control.find('.control-state').text(valNames[controlData['value']]);
+            control.find('.scheduler-ort').text(secToTime(controlData['ORT']));
+            scheduler.toggle(controlData['ORT'] > 0);
+          });
+
+
         });
       };
 
@@ -193,6 +185,20 @@
 <body>
 <div id="spacontrols">
 </div>
+
+<div id="templates" style="display: none">
+  <div class="spacontrol">
+    <span class="control-name"></span>
+    <button type="button" class="control">
+      <span class="control-state"></span>
+    </button>
+    <button type="button" class="scheduler">
+      <span class="scheduler-on">&#9201;</span>
+      <span class="scheduler-ort"></span>
+    </button>
+  </div>
+</div>
+
 <div id="duration-dialog-form" title="Select Duration">
   Please select how long this control should remain in this mode (Hours:Minutes)
   <div id="duration-options">
