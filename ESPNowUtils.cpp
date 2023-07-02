@@ -9,11 +9,12 @@
 #include "ESPNowUtils.h"
 
 void ESPNowUtils::readDataToSend() {
-    outgoingSetpoints.msgType = DATA;
-    outgoingSetpoints.id = 0;
-    outgoingSetpoints.temp = random(0, 40);
-    outgoingSetpoints.hum = random(0, 100);
-    outgoingSetpoints.readingId = counter++;
+    outgoingSetpoints.msgType = CONTROL_STATUS;
+    outgoingSetpoints.board_id = 0;
+    outgoingSetpoints.value=222;
+//    outgoingSetpoints.temp = random(0, 40);
+//    outgoingSetpoints.hum = random(0, 100);
+//    outgoingSetpoints.readingId = counter++;
 }
 
 
@@ -70,29 +71,30 @@ void ESPNowUtils::OnDataRecv(const uint8_t * mac_addr, const uint8_t *incomingDa
     StaticJsonDocument<1000> root;
     uint8_t type = incomingData[0];       // first message byte is the type of message
     switch (type) {
-        case DATA :                           // the message is data type
-            memcpy(&incomingReadings, incomingData, sizeof(incomingReadings));
-            // create a JSON document with received data and send it by event to the web page
-            root["id"] = incomingReadings.id;
-            root["temperature"] = incomingReadings.temp;
-            root["humidity"] = incomingReadings.hum;
-            root["readingId"] = String(incomingReadings.readingId);
-            Serial.print("event send :");
-            serializeJson(root, Serial);
-            Serial.println();
+        case COMMAND :                           // the message is data type
+            memcpy(&incomingCommand, incomingData, sizeof(incomingCommand));
+            callback(&incomingCommand);
+//            // create a JSON document with received data and send it by event to the web page
+//            root["id"] = incomingReadings.board_id;
+//            root["temperature"] = incomingReadings.temp;
+//            root["humidity"] = incomingReadings.hum;
+//            root["readingId"] = String(incomingReadings.readingId);
+//            Serial.print("event send :");
+//            serializeJson(root, Serial);
+//            Serial.println();
             break;
 
         case PAIRING:                            // the message is a pairing request
             memcpy(&pairingData, incomingData, sizeof(pairingData));
             Serial.println(pairingData.msgType);
-            Serial.println(pairingData.id);
+            Serial.println(pairingData.board_id);
             Serial.print("Pairing request from: ");
             printMAC(mac_addr);
             Serial.println();
             Serial.println(pairingData.channel);
-            if (pairingData.id > 0) {     // do not replay to server itself
+            if (pairingData.board_id > 0) {     // do not replay to server itself
                 if (pairingData.msgType == PAIRING) {
-                    pairingData.id = 0;       // 0 is server
+                    pairingData.board_id = 0;       // 0 is server
                     // Server is in AP_STA mode: peers need to send data to server soft AP MAC address
                     WiFi.softAPmacAddress(pairingData.macAddr);
                     pairingData.channel = chan;
@@ -103,6 +105,10 @@ void ESPNowUtils::OnDataRecv(const uint8_t * mac_addr, const uint8_t *incomingDa
             }
             break;
     }
+}
+
+void ESPNowUtils::registerDataCallBackHandler(hot_tub_command_recv_callback callbackFunc) {
+    callback = callbackFunc;
 }
 
 void ESPNowUtils::initESP_NOW() {
@@ -116,8 +122,6 @@ void ESPNowUtils::initESP_NOW() {
 }
 
 void ESPNowUtils::setup() {
-    counter = 0;
-
     Serial.print("Server SOFT AP MAC Address:  ");
     Serial.println(WiFi.softAPmacAddress());
 

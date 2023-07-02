@@ -76,6 +76,7 @@ void setup(void) {
     server.begin();
 
     ESPNowUtils::setup();
+    ESPNowUtils::registerDataCallBackHandler((ESPNowUtils::hot_tub_command_recv_callback)espnowCommandReceived);
 
 }
 
@@ -84,4 +85,17 @@ void loop(void) {
     spaStatus.applyControls();
     ESPNowUtils::loop();
     yield();
+}
+
+void espnowCommandReceived(ESPNowUtils::struct_command *command) {
+    Serial.print("Received command: control=");Serial.print(command->control_id);
+    Serial.print(" value=");Serial.print(command->value);
+    Serial.print(" end=");Serial.print(command->end);
+    Serial.println();
+    spaStatus.controls[command->control_id]->scheduleOverride(
+            now() + command->start,
+            now() + command->end,
+            command->value
+    );
+
 }

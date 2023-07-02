@@ -9,40 +9,49 @@
 #include <WiFi.h>
 //#include "AsyncTCP.h"
 #include <ArduinoJson.h>
+#include <TimeLib.h>
 
 class ESPNowUtils {
 public:
+    // Structure example to receive data
+    // Must match the sender structure
+    typedef struct struct_command {
+        uint8_t msgType;
+        uint8_t board_id;
+        u_int8_t control_id;
+        time_t start;
+        time_t end;
+        u_int8_t value;
+    } struct_command;
+
+    typedef void (*hot_tub_command_recv_callback)(struct_command *command);
+
     static void setup();
     static void loop();
+    static void registerDataCallBackHandler(hot_tub_command_recv_callback callbackFunc);
+
+
 private:
     inline static esp_now_peer_info_t slave;
     inline static int chan;
 
-    enum MessageType {PAIRING, DATA,};
+    enum MessageType {PAIRING, COMMAND, CONTROL_STATUS, METRICS_STATUS};
     static MessageType messageType;
 
     inline static int counter = 0;
 
-    // Structure example to receive data
-    // Must match the sender structure
-    typedef struct struct_message {
-        uint8_t msgType;
-        uint8_t id;
-        float temp;
-        float hum;
-        unsigned int readingId;
-    } struct_message;
 
     typedef struct struct_pairing {       // new structure for pairing
         uint8_t msgType;
-        uint8_t id;
+        uint8_t board_id;
         uint8_t macAddr[6];
         uint8_t channel;
     } struct_pairing;
 
-    inline static struct_message incomingReadings;
-    inline static struct_message outgoingSetpoints;
+    inline static struct_command incomingCommand;
+    inline static struct_command outgoingSetpoints;
     inline static struct_pairing pairingData;
+    inline static hot_tub_command_recv_callback callback;
 
 
     static void readDataToSend();

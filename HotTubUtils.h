@@ -40,6 +40,8 @@ const int LED_PIN = 23;
  *
  */
 class SpaControlScheduler {
+    const int DEFAULT_MIN = 0;
+    const int DEFAULT_MAX = 1;
 public:
 
     /**
@@ -79,7 +81,17 @@ public:
      */
     u_int8_t getScheduledValue();
 
+    // min and max bounds for value, for arg checking
+    u_int8_t min = DEFAULT_MIN;
+    u_int8_t max = DEFAULT_MAX;
+
 private:
+    /**
+     * Utility that will raise an exception for out of bounds
+     * @param value
+     */
+    void checkBounds(u_int8_t value);
+
     static const u_int8_t SCHEDULER_DISABLED_VALUE = -1;
     // default is always off:
     u_int8_t percentageOfDayOnTime = 0;
@@ -98,20 +110,10 @@ private:
 };
 
 class SpaControl : public SpaControlScheduler {
-    const int DEFAULT_MIN = 0;
-    const int DEFAULT_MAX = 1;
 public:
     SpaControl(const char *name, const char *type);
 
     virtual void toggle();
-
-    /**
-     * Change the local (not scheduler) value.
-     * There may be a scheduler on the control that can override this value
-     * Changing that value should be done via the scheduler instance
-     * @param value
-     */
-    virtual void set(u_int8_t value);
 
     /**
      *
@@ -122,8 +124,6 @@ public:
     virtual void applyOutputs();
 
     const char *name;
-    u_int8_t min = DEFAULT_MIN;
-    u_int8_t max = DEFAULT_MAX;
     const char *type;
     JsonObject jsonStatus;
 
@@ -155,8 +155,6 @@ public:
     TwoSpeedSpaControl(const char *name, u_int8_t pin_power, u_int8_t pin_speed);
 
     virtual void toggle();
-
-    virtual void set(u_int8_t value);
 
     virtual void applyOutputs();
 

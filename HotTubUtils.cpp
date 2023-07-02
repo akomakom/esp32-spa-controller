@@ -7,6 +7,8 @@
 void
 SpaControlScheduler::normalSchedule(u_int8_t percentageOfDayOnTime, u_int8_t numberOfTimesToRun, u_int8_t normalValueOn,
                                     u_int8_t normalValueOff) {
+    checkBounds(normalValueOn);
+    checkBounds(normalValueOff);
     this->percentageOfDayOnTime = std::max(0, std::min(100, (int)percentageOfDayOnTime));
     this->numberOfTimesToRun = std::max(1, (int)numberOfTimesToRun);
     this->normalValueOn = normalValueOn;
@@ -21,6 +23,7 @@ SpaControlScheduler::normalSchedule(u_int8_t percentageOfDayOnTime, u_int8_t num
 }
 
 void SpaControlScheduler::scheduleOverride(time_t startTime, time_t endTime, u_int8_t valueOverride) {
+    checkBounds(valueOverride);
     this->overrideStartTime = startTime;
     this->overrideEndTime = endTime;
     this->overrideValue = valueOverride;
@@ -28,6 +31,12 @@ void SpaControlScheduler::scheduleOverride(time_t startTime, time_t endTime, u_i
 
 void SpaControlScheduler::cancelOverride() {
     scheduleOverride(now(), now(), SCHEDULER_DISABLED_VALUE);
+}
+
+void SpaControlScheduler::checkBounds(u_int8_t value) {
+    if (value > max || value < min) {
+        throw std::invalid_argument("Provided value for control is outside allowed range");
+    }
 }
 
 u_int8_t SpaControlScheduler::getScheduledValue() {
@@ -77,14 +86,6 @@ void SpaControl::toggle() {
     Serial.println(getEffectiveValue());
 }
 
-void SpaControl::set(u_int8_t value) {
-    if (value < min || value > max) {
-        throw std::invalid_argument("Provided value for control is outside allowed range");
-    }
-    // TODO: decide on defaults ore take as input
-    scheduleOverride(now(), now() + 2 * SECS_PER_MIN, getNextValue());
-}
-
 u_int8_t SpaControl::getEffectiveValue() {
     return getScheduledValue();
 }
@@ -124,10 +125,6 @@ TwoSpeedSpaControl::TwoSpeedSpaControl(const char *name, u_int8_t pin_power, u_i
 }
 void TwoSpeedSpaControl::toggle() {
     SpaControl::toggle();
-}
-
-void TwoSpeedSpaControl::set(u_int8_t value) {
-    SpaControl::set(value);  // this will check the argument
 }
 
 void TwoSpeedSpaControl::applyOutputs() {
