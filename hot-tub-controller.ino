@@ -7,6 +7,7 @@
 #include "secrets.h"
 #include "web.h"
 #include "HotTubUtils.h"
+#include "ESPNowUtils.h"
 
 
 SpaStatus spaStatus;
@@ -15,6 +16,9 @@ void setup(void) {
     Serial.begin(115200);
     // while(!Serial);
 
+    // To support ESP-NOW
+    // Set the device as a Station and Soft Access Point simultaneously
+    WiFi.mode(WIFI_AP_STA);
     // Connect to WiFi network
     WiFi.begin(WIFI_NAME, WIFI_PASS);
     Serial.println("");
@@ -70,10 +74,14 @@ void setup(void) {
 
     setupServerDefaultActions();
     server.begin();
+
+    ESPNowUtils::setup();
+
 }
 
 void loop(void) {
     server.handleClient();
     spaStatus.applyControls();
+    ESPNowUtils::loop();
     yield();
 }

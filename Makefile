@@ -9,7 +9,7 @@ FQBN_PATH = $(shell echo ${FQBN} | tr : .)
 #SPIFFS_OUTPUT_FILE=build/spiffs.bin
 
 
-compile: build/${FQBN_PATH}/hot-tub-controller.ino.elf
+compile:
 	${ARDUINO_CLI} compile --fqbn esp32:esp32:esp32 .
 
 # TBD
@@ -19,11 +19,15 @@ compile: build/${FQBN_PATH}/hot-tub-controller.ino.elf
 
 # Upload the firmware
 upload: compile
-	 ${ARDUINO_CLI} upload -p ${PORT} --fqbn ${FQBN}  --discovery-timeout 30s . -v
+	 ${ARDUINO_CLI} upload -p ${PORT} --fqbn ${FQBN} --discovery-timeout 30s . -v
 
+# Serial console of the board
+monitor:
+	${ARDUINO_CLI} monitor -p ${PORT} --fqbn ${FQBN} --discovery-timeout 30s -c baudrate=115200 .
 
 # Once firmware is uploaded, it is possible to use this to sync contents of data/ to the ESP
 # without using mkspiffs or arduino IDE's spiffs plugin (this does not handle delete)
+# Note that initial upload must be done first (eg via Arduino IDE or mkspiffs)
 upload-spiffs-via-http: guard-TARGET_IP
 	for file in data/*.* ; do echo Uploading $$file ; curl -X POST -F "data=@$$file"  http://${TARGET_IP}/edit ; done
 

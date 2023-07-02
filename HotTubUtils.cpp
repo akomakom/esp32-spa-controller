@@ -151,7 +151,7 @@ void TwoSpeedSpaControl::applyOutputs() {
 /*** SpaStatus ***/
 
 SpaStatus::SpaStatus() {
-    pump->normalSchedule(50, 2, 1, 0); //temporary for experiments
+    pump->normalSchedule(50, 2, 1, 0); // TODO: Save preferences and build a UI to modify
     for (SpaControl *control: controls) {
         control->jsonStatus = jsonStatusControls.createNestedObject();
     }
