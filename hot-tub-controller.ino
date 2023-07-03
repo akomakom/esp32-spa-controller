@@ -11,9 +11,15 @@
 
 
 SpaStatus spaStatus;
+// Stores last time status was published on esp-now
+unsigned long previousStatusSendTime = 0;
+const long statusSendinterval = 10000;        // Interval at which to publish sensor readings
 
 void setup(void) {
     Serial.begin(115200);
+
+    preferences.begin("hot-tub");
+
     // while(!Serial);
 
     // To support ESP-NOW
@@ -84,9 +90,35 @@ void loop(void) {
     server.handleClient();
     spaStatus.applyControls();
     ESPNowUtils::loop();
+    sendStatus();
     yield();
 }
 
+void sendStatus() {
+    unsigned long currentMillis = millis();
+    if (currentMillis - previousStatusSendTime >= statusSendinterval) {
+        // Save the last time a new reading was published
+        previousStatusSendTime = currentMillis;
+
+        for (int i = 0 ; i < spaStatus.controls.size() ; i++) {
+            SpaControl* control = spaStatus.controls[i];
+            ESPNowUtils::outgoingStatusControl.control_id = i;
+            ESPNowUtils::outgoingStatusControl.min = control->min;
+            ESPNowUtils::outgoingStatusControl.max = control->max;
+            ESPNowUtils::outgoingStatusControl.type = control->type;
+            ESPNowUtils::outgoingStatusControl.name = control->name;
+            ESPNowUtils::outgoingStatusControl.ort = control->getOverrideScheduleRemainingTime();
+            ESPNowUtils::outgoingStatusControl.value = control->getEffectiveValue();
+
+            ESPNowUtils::sendStatusControl();
+        }
+    }
+}
+
+/**
+ * Handle incoming commands received via ESP-NOW
+ * @param command
+ */
 void espnowCommandReceived(ESPNowUtils::struct_command *command) {
     Serial.print("Received command: control=");Serial.print(command->control_id);
     Serial.print(" value=");Serial.print(command->value);

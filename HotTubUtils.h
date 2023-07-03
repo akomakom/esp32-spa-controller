@@ -3,6 +3,8 @@
 #ifndef __UTILS_H__
 #define __UTILS_H__
 
+
+#include <vector>
 #include "pgmspace.h"
 #include <stdexcept>
 #include <Preferences.h>
@@ -23,6 +25,8 @@ const int RELAY_PIN_6 = 14;
 const int RELAY_PIN_7 = 12;
 const int RELAY_PIN_8 = 13;
 const int LED_PIN = 23;
+
+Preferences preferences;
 
 /**
  * A Scheduler that can be attached to any control
@@ -182,8 +186,9 @@ public:
 
     void updateStatusString();
 
+    std::vector<SpaControl*> controls = {pump, blower, heater, ozone};
 //    SpaControl *controls[3] = {blower, heater, ozone};
-    SpaControl *controls[4] = {pump, blower, heater, ozone};
+//    SpaControl *controls[4] = {pump, blower, heater, ozone};
 
 //    SpaControl *controls[5] = {pump, pump_fast, blower, heater, ozone};
 

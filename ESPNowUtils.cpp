@@ -9,9 +9,9 @@
 #include "ESPNowUtils.h"
 
 void ESPNowUtils::readDataToSend() {
-    outgoingSetpoints.msgType = CONTROL_STATUS;
-    outgoingSetpoints.board_id = 0;
-    outgoingSetpoints.value=222;
+//    outgoingSetpoints.msgType = CONTROL_STATUS;
+//    outgoingSetpoints.board_id = 0;
+//    outgoingSetpoints.value=222;
 //    outgoingSetpoints.temp = random(0, 40);
 //    outgoingSetpoints.hum = random(0, 100);
 //    outgoingSetpoints.readingId = counter++;
@@ -111,6 +111,10 @@ void ESPNowUtils::registerDataCallBackHandler(hot_tub_command_recv_callback call
     callback = callbackFunc;
 }
 
+void ESPNowUtils::sendStatusControl() {
+    esp_now_send(NULL, (uint8_t *) &outgoingStatusControl, sizeof(outgoingStatusControl));
+}
+
 void ESPNowUtils::initESP_NOW() {
     // Init ESP-NOW
     if (esp_now_init() != ESP_OK) {
@@ -132,14 +136,17 @@ void ESPNowUtils::setup() {
     Serial.println(WiFi.channel());
 
     initESP_NOW();
+
+    outgoingStatusControl.msgType = CONTROL_STATUS;
+    outgoingStatusControl.board_id = 0;
 }
 
 void ESPNowUtils::loop() {
-    static unsigned long lastEventTime = millis();
-    static const unsigned long EVENT_INTERVAL_MS = 5000;
-    if ((millis() - lastEventTime) > EVENT_INTERVAL_MS) {
-        lastEventTime = millis();
-        readDataToSend();
-        esp_now_send(NULL, (uint8_t *) &outgoingSetpoints, sizeof(outgoingSetpoints));
-    }
+//    static unsigned long lastEventTime = millis();
+//    static const unsigned long EVENT_INTERVAL_MS = 5000;
+//    if ((millis() - lastEventTime) > EVENT_INTERVAL_MS) {
+//        lastEventTime = millis();
+//        readDataToSend();
+//        esp_now_send(NULL, (uint8_t *) &outgoingSetpoints, sizeof(outgoingSetpoints));
+//    }
 }

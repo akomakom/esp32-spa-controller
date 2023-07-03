@@ -13,7 +13,7 @@
 
 class ESPNowUtils {
 public:
-    // Structure example to receive data
+    // Structure to receive data
     // Must match the sender structure
     typedef struct struct_command {
         uint8_t msgType;
@@ -24,13 +24,27 @@ public:
         u_int8_t value;
     } struct_command;
 
+    typedef struct struct_status_control {
+        uint8_t msgType;
+        uint8_t board_id;
+        u_int8_t control_id;
+        u_int8_t min;
+        u_int8_t max;
+        const char* type;
+        const char* name;
+        long ort;
+        u_int8_t value;
+    } struct_status_control;
+
     typedef void (*hot_tub_command_recv_callback)(struct_command *command);
 
     static void setup();
     static void loop();
     static void registerDataCallBackHandler(hot_tub_command_recv_callback callbackFunc);
+    // relies on someone updating outgoingStatusControl first
+    static void sendStatusControl();
 
-
+    inline static struct_status_control outgoingStatusControl;
 private:
     inline static esp_now_peer_info_t slave;
     inline static int chan;
@@ -49,7 +63,6 @@ private:
     } struct_pairing;
 
     inline static struct_command incomingCommand;
-    inline static struct_command outgoingSetpoints;
     inline static struct_pairing pairingData;
     inline static hot_tub_command_recv_callback callback;
 

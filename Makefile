@@ -10,7 +10,7 @@ FQBN_PATH = $(shell echo ${FQBN} | tr : .)
 
 
 compile:
-	${ARDUINO_CLI} compile --fqbn esp32:esp32:esp32 .
+	${ARDUINO_CLI} compile --fqbn ${FQBN} .
 
 # TBD
 #spiffs:
