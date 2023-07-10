@@ -81,7 +81,7 @@ SpaControl::SpaControl(const char *name, const char *type) {
 
 void SpaControl::toggle() {
     // TODO: decide on defaults ore take as input
-    scheduleOverride(now(), now() + 2 * SECS_PER_MIN, getNextValue());
+    scheduleOverride(now(), now() + 20 * SECS_PER_MIN, getNextValue());
     Serial.println("PARENT!!! Value after toggle is ");
     Serial.println(getEffectiveValue());
 }

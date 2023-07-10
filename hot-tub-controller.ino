@@ -30,6 +30,7 @@ void setup(void) {
     Serial.println("");
 
     // Wait for connection
+    // TODO: probably a bad idea
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         Serial.print(".");

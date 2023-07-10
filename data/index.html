@@ -18,11 +18,28 @@
       cursor: pointer;
       color: #ffffff;
       font-family: Arial;
-      font-size: 28px;
+      font-size: x-large;
       font-weight: bold;
       padding: 15px 51px;
       text-decoration: none;
       text-shadow: 0px -1px 0px #5b6178;
+    }
+
+    .spacontrol .control-name {
+      text-transform: capitalize;
+      text-align: center;
+    }
+
+    button {
+      font-size: xxx-large;
+    }
+    button.duration-option {
+      font-size: xxx-large!important; /** override jquery-ui **/
+      margin: 5px;
+      box-shadow: 3px 3px 4px;
+    }
+    button.scheduler {
+      font-size: large;
     }
 
     .spacontrol:hover {
@@ -67,9 +84,10 @@
       let durationChoice = 20;
       let controlName = '';
       let controlValue = 0;
+      let durationDialog;
 
       $.each(durationOptions, function(index, duration) {
-        let option = $('<button type="button"/>');
+        let option = $('<button type="button" class="duration-option"/>');
         option.text(secToTime(duration))
                 .attr('value', duration)
                 .on('click', function() {
@@ -86,6 +104,7 @@
                     success: function() {
                       $(this).removeClass('error');
                       updateStatus();
+                      durationDialog.dialog('close');
                     },
                     error: function () {
                       $(this).addClass('error')
@@ -103,10 +122,9 @@
 
         event.stopPropagation();
         let durationChoice = 20;
-        dialog = $( "#duration-dialog-form" ).dialog({
+        durationDialog = $( "#duration-dialog-form" ).dialog({
 //                  autoOpen: false,
-          height: 400,
-          width: 350,
+          height:'auto', width:'auto',
           modal: true,
           buttons: {
             'Close': function() {
@@ -188,13 +206,13 @@
 
 <div id="templates" style="display: none">
   <div class="spacontrol">
-    <span class="control-name"></span>
+    <div class="control-name"></div>
     <button type="button" class="control">
-      <span class="control-state"></span>
+      <div class="control-state"></div>
     </button>
     <button type="button" class="scheduler">
-      <span class="scheduler-on">&#9201;</span>
-      <span class="scheduler-ort"></span>
+      <div class="scheduler-on">&#9201;</div>
+      <div class="scheduler-ort"></div>
     </button>
   </div>
 </div>
