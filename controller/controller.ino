@@ -4,10 +4,10 @@
 #include <ESPmDNS.h>
 #include <ArduinoJson.h>
 
-#include "secrets.h"
+#include "../secrets.h"
 #include "web.h"
-#include "HotTubUtils.h"
-#include "ESPNowUtils.h"
+#include "../HotTubUtils.h"
+#include "../ESPNowUtils.h"
 
 
 SpaStatus spaStatus;
