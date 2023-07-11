@@ -1,8 +1,7 @@
 #include <sys/types.h>
 
-#ifndef __UTILS_H__
-#define __UTILS_H__
-
+#ifndef HOT_TUB_CONTROLLER_HOTTUBUTILS_H
+#define HOT_TUB_CONTROLLER_HOTTUBUTILS_H
 
 #include <vector>
 #include "pgmspace.h"
@@ -26,7 +25,7 @@ const int RELAY_PIN_7 = 12;
 const int RELAY_PIN_8 = 13;
 const int LED_PIN = 23;
 
-Preferences preferences;
+extern Preferences app_preferences;
 
 /**
  * A Scheduler that can be attached to any control
@@ -199,4 +198,4 @@ public:
 };
 
 
-#endif
+#endif //HOT_TUB_CONTROLLER_HOTTUBUTILS_H

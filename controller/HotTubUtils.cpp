@@ -3,6 +3,9 @@
 #include "HotTubUtils.h"
 #include <algorithm>
 
+
+extern Preferences app_preferences = Preferences();
+
 /*** SpaControlScheduler ***/
 void
 SpaControlScheduler::normalSchedule(u_int8_t percentageOfDayOnTime, u_int8_t numberOfTimesToRun, u_int8_t normalValueOn,
