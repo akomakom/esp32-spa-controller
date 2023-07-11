@@ -2,14 +2,22 @@
 # arduino-cli instead of arduino IDE
 
 ARDUINO_CLI ?= /opt/arduino-cli/arduino-cli
+BAUD ?= 115200
 PORT ?= /dev/ttyUSB0
 FQBN ?= esp32:esp32:esp32
 FQBN_PATH = $(shell echo ${FQBN} | tr : .)
 #MKSPIFFS ?= /opt/arduino-cli/mkspiffs
 #SPIFFS_OUTPUT_FILE=build/spiffs.bin
 
+# Because arduino can't handle a relative path parent directory include, we symlink these:
+# On windows you may need to copy the files to each project instead
+secrets.h:
+	ln -s ../secrets.h .
 
-compile:
+hot_tub_types.h:
+	ln -s ../hot_tub_types.h .
+
+compile: secrets.h hot_tub_types.h
 	${ARDUINO_CLI} compile --fqbn ${FQBN} .
 
 # TBD
@@ -23,7 +31,7 @@ upload: compile
 
 # Serial console of the board
 monitor:
-	${ARDUINO_CLI} monitor -p ${PORT} --fqbn ${FQBN} --discovery-timeout 30s -c baudrate=115200 .
+	while [ 1 ] ; do ${ARDUINO_CLI} monitor -p ${PORT} --fqbn ${FQBN} --discovery-timeout 30s -c baudrate=${BAUD} . ; done
 
 # Once firmware is uploaded, it is possible to use this to sync contents of data/ to the ESP
 # without using mkspiffs or arduino IDE's spiffs plugin (this does not handle delete)

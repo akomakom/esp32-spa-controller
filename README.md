@@ -31,6 +31,8 @@ This is work-in-progress.
 
 #### Controller
 
+In `controller/` subdirectory:
+
 2. Build and upload the controller code using either:
   * Arduino IDE (ensure you have ESP32 board support installed)
   * arduino-cli, if installed (try `make upload`)

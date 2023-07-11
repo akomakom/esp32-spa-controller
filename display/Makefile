@@ -2,14 +2,22 @@
 # arduino-cli instead of arduino IDE
 
 ARDUINO_CLI ?= /opt/arduino-cli/arduino-cli
+BAUD ?= 115200
 PORT ?= /dev/ttyUSB2
 FQBN ?= esp32:esp32:esp32s3
 FQBN_PATH = $(shell echo ${FQBN} | tr : .)
 #MKSPIFFS ?= /opt/arduino-cli/mkspiffs
 #SPIFFS_OUTPUT_FILE=build/spiffs.bin
 
+# Because arduino can't handle a relative path parent directory include, we symlink these:
+# On windows you may need to copy the files to each project instead
+secrets.h:
+	ln -s ../secrets.h .
 
-compile:
+hot_tub_types.h:
+	ln -s ../hot_tub_types.h .
+
+compile: secrets.h hot_tub_types.h
 	${ARDUINO_CLI} compile --fqbn ${FQBN} .
 
 # TBD
@@ -23,11 +31,5 @@ upload: compile
 
 # Serial console of the board
 monitor:
-	while [ 1 ] ; do ${ARDUINO_CLI} monitor -p ${PORT} --fqbn ${FQBN} --discovery-timeout 30s -c baudrate=115200 . ; done
+	while [ 1 ] ; do ${ARDUINO_CLI} monitor -p ${PORT} --fqbn ${FQBN} --discovery-timeout 30s -c baudrate=${BAUD} . ; done
 
-# Check that the named variable is set
-guard-%:
-	@ if [ "${${*}}" = "" ]; then \
-		echo "Environment variable $* not set"; \
-		exit 1; \
-	fi

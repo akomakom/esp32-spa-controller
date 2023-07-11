@@ -4,10 +4,10 @@
 #include <ESPmDNS.h>
 #include <ArduinoJson.h>
 
-#include "../secrets.h"
+#include "secrets.h"
 #include "web.h"
-#include "../HotTubUtils.h"
-#include "../ESPNowUtils.h"
+#include "HotTubUtils.h"
+#include "ESPNowUtils.h"
 
 
 SpaStatus spaStatus;
@@ -18,7 +18,7 @@ const long statusSendinterval = 10000;        // Interval at which to publish se
 void setup(void) {
     Serial.begin(115200);
 
-    preferences.begin("hot-tub");
+    app_preferences.begin("hot-tub");
 
     // while(!Serial);
 
@@ -120,7 +120,7 @@ void sendStatus() {
  * Handle incoming commands received via ESP-NOW
  * @param command
  */
-void espnowCommandReceived(ESPNowUtils::struct_command *command) {
+void espnowCommandReceived(struct_command *command) {
     Serial.print("Received command: control=");Serial.print(command->control_id);
     Serial.print(" value=");Serial.print(command->value);
     Serial.print(" end=");Serial.print(command->end);

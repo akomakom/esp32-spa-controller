@@ -11,30 +11,11 @@
 #include <ArduinoJson.h>
 #include <TimeLib.h>
 
+#include "hot_tub_types.h"
+
+
 class ESPNowUtils {
 public:
-    // Structure to receive data
-    // Must match the sender structure
-    typedef struct struct_command {
-        uint8_t msgType;
-        uint8_t board_id;
-        u_int8_t control_id;
-        time_t start;
-        time_t end;
-        u_int8_t value;
-    } struct_command;
-
-    typedef struct struct_status_control {
-        uint8_t msgType;
-        uint8_t board_id;
-        u_int8_t control_id;
-        u_int8_t min;
-        u_int8_t max;
-        const char* type;
-        const char* name;
-        long ort;
-        u_int8_t value;
-    } struct_status_control;
 
     typedef void (*hot_tub_command_recv_callback)(struct_command *command);
 
@@ -54,13 +35,6 @@ private:
 
     inline static int counter = 0;
 
-
-    typedef struct struct_pairing {       // new structure for pairing
-        uint8_t msgType;
-        uint8_t board_id;
-        uint8_t macAddr[6];
-        uint8_t channel;
-    } struct_pairing;
 
     inline static struct_command incomingCommand;
     inline static struct_pairing pairingData;
