@@ -151,6 +151,7 @@ void TwoSpeedSpaControl::applyOutputs() {
 /*** SpaStatus ***/
 
 SpaStatus::SpaStatus() {
+    timeClient = new NTPClient(ntpUDP, "pool.ntp.org", 0, 3600000);
     pump->normalSchedule(50, 2, 1, 0); // TODO: Save preferences and build a UI to modify
     for (SpaControl *control: controls) {
         control->jsonStatus = jsonStatusControls.createNestedObject();
@@ -168,6 +169,7 @@ void SpaStatus::updateStatusString() {
     }
 
     jsonStatusMetrics["temp"] = 100;
+    jsonStatusMetrics["time"] = timeClient->getFormattedTime();
     serializeJson(jsonStatus, statusString);
 }
 
@@ -185,8 +187,17 @@ SpaControl *SpaStatus::findByName(const char *name) {
     throw std::invalid_argument(buffer);
 }
 
-void SpaStatus::applyControls() {
+void SpaStatus::setup() {
+
+    timeClient->begin();
+    temperatureUtils.setup();
+
+}
+
+void SpaStatus::loop() {
+    timeClient->update();
     for (SpaControl *control: controls) {
         control->applyOutputs();
     }
+    temperatureUtils.loop();
 }

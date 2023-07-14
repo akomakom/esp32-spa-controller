@@ -11,8 +11,14 @@
 #include <TimeLib.h>
 #include <TimeAlarms.h>
 
+// NTP stuff
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+
+#include "TemperatureUtils.h"
+
 // needs to be large enough to allocate json document and string representation
-#define STATUS_LENGTH 500
+#define STATUS_LENGTH 600
 
 // 8 channel relay ESP32-WROOM module from China:
 const int RELAY_PIN_1 = 32;
@@ -26,6 +32,12 @@ const int RELAY_PIN_8 = 13;
 const int LED_PIN = 23;
 
 extern Preferences app_preferences;
+
+
+class SpaSensor {
+
+};
+
 
 /**
  * A Scheduler that can be attached to any control
@@ -170,6 +182,9 @@ private:
     StaticJsonDocument<STATUS_LENGTH> jsonStatus;
     JsonArray jsonStatusControls = jsonStatus.createNestedArray("controls");
     JsonObject jsonStatusMetrics = jsonStatus.createNestedObject("metrics");
+    TemperatureUtils temperatureUtils;
+    WiFiUDP ntpUDP;
+    NTPClient *timeClient;
 
 public:
     SpaStatus();
@@ -193,8 +208,8 @@ public:
 
     SpaControl *findByName(const char *name);
 
-    void applyControls();
-
+    void setup();
+    void loop();
 };
 
 

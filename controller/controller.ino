@@ -9,7 +9,6 @@
 #include "HotTubUtils.h"
 #include "ESPNowUtils.h"
 
-
 SpaStatus spaStatus;
 // Stores last time status was published on esp-now
 unsigned long previousStatusSendTime = 0;
@@ -48,6 +47,7 @@ void setup(void) {
             delay(1000);
         }
     }
+
     SPIFFS.begin();
     Serial.println("mDNS responder started");
 
@@ -82,6 +82,7 @@ void setup(void) {
     setupServerDefaultActions();
     server.begin();
 
+    spaStatus.setup();
     ESPNowUtils::setup();
     ESPNowUtils::registerDataCallBackHandler((ESPNowUtils::hot_tub_command_recv_callback)espnowCommandReceived);
 
@@ -89,7 +90,7 @@ void setup(void) {
 
 void loop(void) {
     server.handleClient();
-    spaStatus.applyControls();
+    spaStatus.loop();
     ESPNowUtils::loop();
     sendStatus();
     yield();

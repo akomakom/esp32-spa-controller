@@ -1,2 +1,6 @@
 /secrets.h
 *.bin
+/controller/hot_tub_types.h
+/controller/secrets.h
+/display/hot_tub_types.h
+/display/secrets.h
