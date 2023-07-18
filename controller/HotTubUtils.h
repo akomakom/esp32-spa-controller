@@ -38,6 +38,61 @@ class SpaSensor {
 
 };
 
+class SpaControl; //forward declare
+
+class SpaControlDependencies {
+private:
+    SpaControl* neededByOtherControl = NULL;
+    u_int8_t neededByOtherControlValue;
+    u_int8_t neededByOurValue;
+
+    SpaControl* lockedToOtherControl = NULL;
+    u_int8_t lockedToOtherControlValue;
+    u_int8_t lockedToOurValue;
+
+    static u_int8_t getDependencyValue(SpaControl* other, u_int8_t otherValue, u_int8_t ourValue);
+public:
+    static const u_int8_t SPECIAL_VALUE_ANY_GREATER_THAN_ZERO = 254;
+    static const u_int8_t SPECIAL_RETURN_VALUE_NOT_IN_EFFECT = 255;
+
+    /**
+     * Declare that this control has a dependency and is needed by otherControl
+     * This means that when otherControl's value is otherControlValue, our value should be ourValue.
+     * This takes priority over normal schedule but not override schedule.
+     *
+     * eg: pump->neededBy(heater, 1, 1)
+     * Pump should be on when heater wants to be on, in other words
+     * pump value should be 1 when heater's value is 1, unless we're in override.
+     * Ignore normal schedule during this time.
+     *
+     * @param otherControl pointer to control that needs our control
+     * @param otherControlValue we only care obout otherControl's value when it's this
+     * @param ourValue Change us to this value when these conditions are met
+     */
+    void neededBy(SpaControl* otherControl, u_int8_t otherControlValue, u_int8_t ourValue);
+
+    /**
+     * Similar to neededBy:
+     *
+     * ozone->lockedTo(pump, SPECIAL_VALUE_ANY_GREATER_THAN_ZERO, 1)
+     * This means that whenever pump is on (any speed, value 1 or 2), ozone should be on.
+     *
+     * ozone->lockedTo(pump, 1, 1)
+     * Ozone should be ON only when pump is in LOW speed.
+     *
+     *
+     * @param otherControl
+     * @param otherControlValue
+     * @param ourValue
+     */
+    void lockedTo(SpaControl* otherControl, u_int8_t otherControlValue, u_int8_t ourValue);
+    /**
+     * @return value that the dependent control would like us to use, if configured and conditions are met,
+     *  or SPECIAL_RETURN_VALUE_NOT_IN_EFFECT
+     */
+    u_int8_t getDependencyValue();
+};
+
 
 /**
  * A Scheduler that can be attached to any control
@@ -90,9 +145,11 @@ public:
     time_t getOverrideScheduleRemainingTime();
 
     /**
-     * @return scheduled value if schedule is enabled
-     * If override is enabled, returns overrideValue
-     * Returns normalValueOn or normalValueOff otherwise
+     * @return If override is enabled, returns overrideValue
+     */
+    u_int8_t getOverrideValue();
+    /**
+     * @return normalValueOn or normalValueOff otherwise
      */
     u_int8_t getScheduledValue();
 
@@ -124,7 +181,7 @@ private:
     float onVsOff = 0; //defaults based on values of variables above (always off)
 };
 
-class SpaControl : public SpaControlScheduler {
+class SpaControl : public SpaControlScheduler, public SpaControlDependencies {
 public:
     SpaControl(const char *name, const char *type);
 
@@ -191,20 +248,18 @@ public:
 
 //    SpaControl *pump = new SimpleSpaControl("pump", RELAY_PIN_1);
 //    SpaControl *pump_fast = new SimpleSpaControl("pump_fast", RELAY_PIN_2);
-    SpaControl *pump = new TwoSpeedSpaControl("pump", RELAY_PIN_1, RELAY_PIN_2);
-    SpaControl *blower = new SimpleSpaControl("blower", RELAY_PIN_3);
-    SpaControl *heater = new SimpleSpaControl("heater", RELAY_PIN_4);
-    SpaControl *ozone = new SimpleSpaControl("ozone", RELAY_PIN_5);
+    SpaControl* pump = new TwoSpeedSpaControl("pump", RELAY_PIN_1, RELAY_PIN_2);
+    SpaControl* blower = new SimpleSpaControl("blower", RELAY_PIN_3);
+    SpaControl* heater = new SimpleSpaControl("heater", RELAY_PIN_4);
+    SpaControl* ozone = new SimpleSpaControl("ozone", RELAY_PIN_5);
+    SpaControl* light = new SimpleSpaControl("light", RELAY_PIN_6);
 
+    // You may need to increase STATUS_LENGTH if adding more controls
     char statusString[STATUS_LENGTH];
 
     void updateStatusString();
 
-    std::vector<SpaControl*> controls = {pump, blower, heater, ozone};
-//    SpaControl *controls[3] = {blower, heater, ozone};
-//    SpaControl *controls[4] = {pump, blower, heater, ozone};
-
-//    SpaControl *controls[5] = {pump, pump_fast, blower, heater, ozone};
+    std::vector<SpaControl*> controls = {pump, blower, heater, ozone, light};
 
     SpaControl *findByName(const char *name);
 

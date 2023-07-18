@@ -6,6 +6,48 @@
 
 extern Preferences app_preferences = Preferences();
 
+/*** SpaControlDependencies ***/
+
+void SpaControlDependencies::neededBy(SpaControl *otherControl, u_int8_t otherControlValue, u_int8_t ourValue) {
+    this->neededByOtherControl = otherControl;
+    this->neededByOtherControlValue = otherControlValue;
+    this->neededByOurValue = ourValue;
+}
+
+void SpaControlDependencies::lockedTo(SpaControl *otherControl, u_int8_t otherControlValue, u_int8_t ourValue) {
+    this->lockedToOtherControl = otherControl;
+    this->lockedToOtherControlValue = otherControlValue;
+    this->lockedToOurValue = ourValue;
+}
+
+/**
+ * Code must be kept in sync with isDependencyInEffect 
+ */
+u_int8_t SpaControlDependencies::getDependencyValue(SpaControl* other, u_int8_t otherValue, u_int8_t ourValue) {
+    u_int8_t result = SPECIAL_RETURN_VALUE_NOT_IN_EFFECT;
+    if (other != NULL) {
+        if (otherValue == other->getEffectiveValue()) {
+            result = ourValue;
+        } else if (otherValue == SPECIAL_VALUE_ANY_GREATER_THAN_ZERO && other->getEffectiveValue() > 0) {
+            result = ourValue;
+        }
+        if (result == SPECIAL_VALUE_ANY_GREATER_THAN_ZERO) {
+            result = other->getEffectiveValue(); // use the same value for us
+        }
+    }
+    return result;
+}
+
+u_int8_t SpaControlDependencies::getDependencyValue() {
+    u_int8_t result = getDependencyValue(lockedToOtherControl, lockedToOtherControlValue, lockedToOurValue);
+    if (result == SPECIAL_RETURN_VALUE_NOT_IN_EFFECT) {
+        result = getDependencyValue(neededByOtherControl, neededByOtherControlValue, neededByOurValue);
+    }
+
+    return result;
+}
+
+
 /*** SpaControlScheduler ***/
 void
 SpaControlScheduler::normalSchedule(u_int8_t percentageOfDayOnTime, u_int8_t numberOfTimesToRun, u_int8_t normalValueOn,
@@ -43,9 +85,7 @@ void SpaControlScheduler::checkBounds(u_int8_t value) {
 }
 
 u_int8_t SpaControlScheduler::getScheduledValue() {
-    if (isOverrideScheduleEnabled()) {
-        return overrideValue;
-    }
+
     // trust normal schedule.
     // Normal schedule if a series of on-off time segments configured as a percentage of a day's length
 
@@ -69,6 +109,10 @@ bool SpaControlScheduler::isOverrideScheduleEnabled() {
     return (getOverrideScheduleRemainingTime() > 0 && overrideValue != SCHEDULER_DISABLED_VALUE);
 }
 
+u_int8_t SpaControlScheduler::getOverrideValue() {
+    return overrideValue;
+}
+
 time_t SpaControlScheduler::getOverrideScheduleRemainingTime() {
     if (overrideStartTime <= now()) {
         return std::max((time_t)0, overrideEndTime - now());
@@ -90,6 +134,13 @@ void SpaControl::toggle() {
 }
 
 u_int8_t SpaControl::getEffectiveValue() {
+    if (isOverrideScheduleEnabled()) {
+        return getOverrideValue();
+    }
+    u_int8_t dependencyValue = getDependencyValue();
+    if (dependencyValue != SpaControlDependencies::SPECIAL_RETURN_VALUE_NOT_IN_EFFECT) {
+        return dependencyValue;
+    }
     return getScheduledValue();
 }
 
@@ -152,7 +203,11 @@ void TwoSpeedSpaControl::applyOutputs() {
 
 SpaStatus::SpaStatus() {
     timeClient = new NTPClient(ntpUDP, "pool.ntp.org", 0, 3600000);
+
     pump->normalSchedule(50, 2, 1, 0); // TODO: Save preferences and build a UI to modify
+    pump->neededBy(heater, 1, 1);
+    ozone->lockedTo(pump, SpaControlDependencies::SPECIAL_VALUE_ANY_GREATER_THAN_ZERO, 1);
+
     for (SpaControl *control: controls) {
         control->jsonStatus = jsonStatusControls.createNestedObject();
     }
