@@ -47,7 +47,7 @@
     }
 
     .sensor-based button.control-incremental {
-      display: block;
+      display: initial;
     }
 
 
@@ -80,7 +80,7 @@
     $(document).ready(function() {
 
       //TODO: get all this from server
-      let durationOptions = [0,1,2,3,4,5,10,15,20,30,45,60,120,240,480,720,1440,2880,4320,7200,10080]
+      let durationOptions = [0,1,2,3,4,5,10,15,20,30,45,60,120,240,480,720,1440,2880,4320,7200,10080,20160,43200,86400]
 
       // saved state for override duration edit dialog:
       let durationChoice = 20;
@@ -90,7 +90,7 @@
 
       $.each(durationOptions, function(index, duration) {
         let option = $('<button type="button" class="duration-option"/>');
-        option.text(duration == 0 ? "End Now" : humanizeDuration(duration*60000))
+        option.text(duration == 0 ? "End Now" : humanizeDuration(duration*60000, {largest: 1, round: true}))
                 .attr('value', duration)
                 .on('click', function() {
                   durationChoice = duration;
@@ -192,7 +192,10 @@
 
             if (control.length == 0) {
               //first load, create controls
-              control = $('#templates .spacontrol').clone().attr('name', controlData['name']).addClass(controlData['type']);
+              control = $('#templates .spacontrol')
+                      .clone()
+                      .attr('name', controlData['name'])
+                      .addClass(controlData['type']);
               controlButton = control.find('.control')
                       .attr('value', controlData['value'])
                       .attr('name', controlData['name']);
@@ -203,24 +206,38 @@
               control.data('status', controlData);
 
               switch(controlData['type']) {
-                case 'off-low-high':
-                  controlButton.on('click', toggleClickHandler);
-                  break;
                 case 'sensor-based':
+                  // TODO: unhardcode default duration
+                  let defaultDuration = 60;
                   controlButton.on('click', function () {
                     let newTemp = prompt("Temperature");
                     if (newTemp) {
-                      setOverrideClickHandler(controlData['name'], 60, newTemp, updateStatus);
+                      setOverrideClickHandler(controlData['name'], defaultDuration, newTemp, updateStatus);
                     }
                   });
+
+                  let clickTimeout;
+                  let changeDelta = 0;
+                  let delayedChange = function(delta) {
+                    clearTimeout(clickTimeout);
+                    changeDelta += delta;
+                    let currentValue = parseInt(controlButton.attr('value'));
+                    control.find('.control-state').text(valNames[currentValue + changeDelta]); //duplicated below
+                    clickTimeout = setTimeout(function(){
+                      setOverrideClickHandler(controlData['name'], defaultDuration, changeDelta + currentValue, updateStatus);
+                      changeDelta = 0;
+                    }, 500);
+                  }
+
                   control.find('.minus').on('click', function() {
-                    // TODO: unhardcode
-                    setOverrideClickHandler(controlData['name'], 60, controlData['value'] - 1, updateStatus);
+                    delayedChange(-1);
                   });
                   control.find('.plus').on('click', function() {
-                    // TODO: unhardcode
-                    setOverrideClickHandler(controlData['name'], 60, controlData['value'] + 1, updateStatus);
+                    delayedChange(1);
                   });
+                  break;
+                case 'off-low-high':
+                  controlButton.on('click', toggleClickHandler);
                   break;
                 default:
                   controlButton.on('click', toggleClickHandler);
@@ -234,7 +251,7 @@
 
             control.find('.control-name').text(controlData['name']);
             control.find('.control-state').text(valNames[controlData['value']]);
-            control.find('.scheduler-ort').text(humanizeDuration(controlData['ORT'] * 1000,  { round: true, largest: 2  }));
+            control.find('.scheduler-ort').text(humanizeDuration(controlData['ORT'] * 1000,  { round: true, largest: 1  }));
             scheduler.toggle(controlData['ORT'] > 0);
           });
 
@@ -250,7 +267,8 @@
 </head>
 <body>
 <div id="spastatus">
-  <div id="temp"></div>
+  Water Temperature:
+  <span id="temp"></span>F
 </div>
 <div id="spacontrols">
 </div>
