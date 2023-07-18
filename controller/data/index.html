@@ -42,6 +42,16 @@
       font-size: large;
     }
 
+    button.control-incremental {
+      display: none;
+    }
+
+    .sensor-based button.control-incremental {
+      display: block;
+    }
+
+
+
     .spacontrol:hover {
       background: linear-gradient(to bottom, #019ad2 5%, #33bdef 100%);
       background-color: #019ad2;
@@ -64,21 +74,13 @@
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
   <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.13.2/themes/smoothness/jquery-ui.css">
   <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/humanize-duration/3.29.0/humanize-duration.min.js"></script>
   <script>
-
-    // https://stackoverflow.com/a/71184881/1735931
-    function secToTime(seconds, separator) {
-      return [
-        parseInt(seconds / 60 / 60),
-        parseInt(seconds / 60 % 60),
-        parseInt(seconds % 60)
-      ].join(separator ? separator : ':').replace(/\b(\d)\b/g, "0$1").replace(/^00\:/,'')
-    }
 
     $(document).ready(function() {
 
       //TODO: get all this from server
-      let durationOptions = [0,1,2,3,4,5,10,15,20,30,45,60,120,240,480]
+      let durationOptions = [0,1,2,3,4,5,10,15,20,30,45,60,120,240,480,720,1440,2880,4320,7200,10080]
 
       // saved state for override duration edit dialog:
       let durationChoice = 20;
@@ -88,29 +90,24 @@
 
       $.each(durationOptions, function(index, duration) {
         let option = $('<button type="button" class="duration-option"/>');
-        option.text(secToTime(duration))
+        option.text(duration == 0 ? "End Now" : humanizeDuration(duration*60000))
                 .attr('value', duration)
                 .on('click', function() {
                   durationChoice = duration;
-                  $.ajax({
-                    type: "POST",
-                    url: '/override',
-                    data: {
-                      control:  controlName,
-                      start: 0,
-                      duration: durationChoice * 60,
-                      value: controlValue,
-                    },
-                    success: function() {
-                      $(this).removeClass('error');
-                      updateStatus();
-                      durationDialog.dialog('close');
-                    },
-                    error: function () {
-                      $(this).addClass('error')
-                    },
-                    dataType: 'json'
-                  });
+                  setOverrideClickHandler(
+                          controlName,
+                          durationChoice,
+                          controlValue,
+                          function() {
+                            $(this).removeClass('error');
+                            updateStatus();
+                            durationDialog.dialog('close');
+                          },
+                          function () {
+                            $(this).addClass('error')
+                          }
+                  );
+
                 });
         $('#duration-options').append(option);
       });
@@ -153,20 +150,50 @@
           dataType: 'json'
         });
       }
+
+      let setOverrideClickHandler = function(controlName, durationMinutes, controlValue, successHandler, failureHandler) {
+        $.ajax({
+          type: "POST",
+          url: '/override',
+          data: {
+            control:  controlName,
+            start: 0,
+            duration: durationMinutes * 60,
+            value: controlValue,
+          },
+          success: successHandler,
+          error: failureHandler,
+          dataType: 'json'
+        });
+      }
+
       let updateStatus = function () {
         $.getJSON( "status", function( data ) {
 
+
+          $('#temp').text(data.metrics.temp);
 
           $.each(data.controls, function(index, controlData) {
             let control  = $(`#spacontrols .spacontrol[name="${controlData['name']}"]`);
             let controlButton = control.find('.control');
             let scheduler = control.find('.scheduler');
 
+            let valNames = ["OFF", "ON"];
+            switch(controlData['type']) {
+              case 'off-low-high':
+                valNames = ["OFF", "LOW", "HIGH"];
+                break;
+              case 'sensor-based':
+                for (let i = controlData['min'] ; i <= controlData['max']; i++) {
+                  valNames[i] = i + "F";
+                }
+                break;
+            }
+
             if (control.length == 0) {
               //first load, create controls
-              control = $('#templates .spacontrol').clone().attr('name', controlData['name']);
+              control = $('#templates .spacontrol').clone().attr('name', controlData['name']).addClass(controlData['type']);
               controlButton = control.find('.control')
-                      .on('click', toggleClickHandler)
                       .attr('value', controlData['value'])
                       .attr('name', controlData['name']);
               scheduler = control.find('.scheduler')
@@ -175,18 +202,39 @@
                       .attr('name', controlData['name']);
               control.data('status', controlData);
 
+              switch(controlData['type']) {
+                case 'off-low-high':
+                  controlButton.on('click', toggleClickHandler);
+                  break;
+                case 'sensor-based':
+                  controlButton.on('click', function () {
+                    let newTemp = prompt("Temperature");
+                    if (newTemp) {
+                      setOverrideClickHandler(controlData['name'], 60, newTemp, updateStatus);
+                    }
+                  });
+                  control.find('.minus').on('click', function() {
+                    // TODO: unhardcode
+                    setOverrideClickHandler(controlData['name'], 60, controlData['value'] - 1, updateStatus);
+                  });
+                  control.find('.plus').on('click', function() {
+                    // TODO: unhardcode
+                    setOverrideClickHandler(controlData['name'], 60, controlData['value'] + 1, updateStatus);
+                  });
+                  break;
+                default:
+                  controlButton.on('click', toggleClickHandler);
+              }
+
             }
             $('#spacontrols').append(control);
 
             controlButton.attr('value', controlData['value']);
             scheduler.attr('value', controlData['value']);
-            let valNames = ["OFF", "ON"];
-            if (controlData['type'] ==  'off-low-high') {
-              valNames = ["OFF", "LOW", "HIGH"];
-            }
+
             control.find('.control-name').text(controlData['name']);
             control.find('.control-state').text(valNames[controlData['value']]);
-            control.find('.scheduler-ort').text(secToTime(controlData['ORT']));
+            control.find('.scheduler-ort').text(humanizeDuration(controlData['ORT'] * 1000,  { round: true, largest: 2  }));
             scheduler.toggle(controlData['ORT'] > 0);
           });
 
@@ -201,15 +249,22 @@
   </script>
 </head>
 <body>
+<div id="spastatus">
+  <div id="temp"></div>
+</div>
 <div id="spacontrols">
 </div>
 
 <div id="templates" style="display: none">
   <div class="spacontrol">
     <div class="control-name"></div>
-    <button type="button" class="control">
-      <div class="control-state"></div>
-    </button>
+    <div class="button-row">
+      <button type="button" class="control-incremental minus">-</button>
+      <button type="button" class="control">
+        <span class="control-state"></span>
+      </button>
+      <button type="button" class="control-incremental plus">+</button>
+    </div>
     <button type="button" class="scheduler">
       <div class="scheduler-on">&#9201;</div>
       <div class="scheduler-ort"></div>
@@ -218,7 +273,7 @@
 </div>
 
 <div id="duration-dialog-form" title="Select Duration">
-  Please select how long this control should remain in this mode (Hours:Minutes)
+  Please select how long this control should remain in this mode before returning to normal schedule.
   <div id="duration-options">
   </div>
   </form>

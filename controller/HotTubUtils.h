@@ -3,6 +3,9 @@
 #ifndef HOT_TUB_CONTROLLER_HOTTUBUTILS_H
 #define HOT_TUB_CONTROLLER_HOTTUBUTILS_H
 
+#include "esp32-hal-gpio.h"
+#include <algorithm>
+
 #include <vector>
 #include "pgmspace.h"
 #include <stdexcept>
@@ -18,7 +21,7 @@
 #include "TemperatureUtils.h"
 
 // needs to be large enough to allocate json document and string representation
-#define STATUS_LENGTH 600
+#define STATUS_LENGTH 1000
 
 // 8 channel relay ESP32-WROOM module from China:
 const int RELAY_PIN_1 = 32;
@@ -234,6 +237,16 @@ public:
     u_int8_t pinSpeed;
 };
 
+class SensorBasedControl: public SpaControl {
+public:
+    SensorBasedControl(const char *name, u_int8_t pin, u_int8_t sensorIndex, TemperatureUtils* temps);
+    virtual void applyOutputs();
+
+    u_int8_t pin;
+    u_int8_t sensorIndex;
+    TemperatureUtils* temperatureUtils;
+};
+
 class SpaStatus {
 private:
     StaticJsonDocument<STATUS_LENGTH> jsonStatus;
@@ -250,7 +263,7 @@ public:
 //    SpaControl *pump_fast = new SimpleSpaControl("pump_fast", RELAY_PIN_2);
     SpaControl* pump = new TwoSpeedSpaControl("pump", RELAY_PIN_1, RELAY_PIN_2);
     SpaControl* blower = new SimpleSpaControl("blower", RELAY_PIN_3);
-    SpaControl* heater = new SimpleSpaControl("heater", RELAY_PIN_4);
+    SpaControl* heater = new SensorBasedControl("heater", RELAY_PIN_4, 0, &temperatureUtils);
     SpaControl* ozone = new SimpleSpaControl("ozone", RELAY_PIN_5);
     SpaControl* light = new SimpleSpaControl("light", RELAY_PIN_6);
 

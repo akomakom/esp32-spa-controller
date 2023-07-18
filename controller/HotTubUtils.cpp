@@ -1,7 +1,6 @@
-#include <sys/types.h>
-#include "esp32-hal-gpio.h"
+
 #include "HotTubUtils.h"
-#include <algorithm>
+
 
 
 extern Preferences app_preferences = Preferences();
@@ -198,16 +197,33 @@ void TwoSpeedSpaControl::applyOutputs() {
     }
 }
 
+SensorBasedControl::SensorBasedControl(const char *name, u_int8_t pin, u_int8_t sensorIndex, TemperatureUtils* temps) : SpaControl(name, "sensor-based") {
+    this->pin = pin;
+    this->sensorIndex = sensorIndex;
+    this->min = 60; // using Fahrenheit because there is better resolution with integers
+    this->max = 105;
+    this->temperatureUtils = temps;
+
+    pinMode(pin, OUTPUT);
+}
+
+void SensorBasedControl::applyOutputs() {
+    digitalWrite(pin, (getEffectiveValue() > temperatureUtils->getTempF(this->sensorIndex)) ? HIGH : LOW);
+}
+
 
 /*** SpaStatus ***/
 
 SpaStatus::SpaStatus() {
     timeClient = new NTPClient(ntpUDP, "pool.ntp.org", 0, 3600000);
 
+    // Behavior
     pump->normalSchedule(50, 2, 1, 0); // TODO: Save preferences and build a UI to modify
+    heater->normalSchedule(100, 1, heater->max, heater->min); // always on, set to 105F
     pump->neededBy(heater, 1, 1);
     ozone->lockedTo(pump, SpaControlDependencies::SPECIAL_VALUE_ANY_GREATER_THAN_ZERO, 1);
 
+    // JSON init
     for (SpaControl *control: controls) {
         control->jsonStatus = jsonStatusControls.createNestedObject();
     }
@@ -223,7 +239,7 @@ void SpaStatus::updateStatusString() {
         control->jsonStatus["ORT"] = control->getOverrideScheduleRemainingTime();
     }
 
-    jsonStatusMetrics["temp"] = 100;
+    jsonStatusMetrics["temp"] = temperatureUtils.getTempF(0);
     jsonStatusMetrics["time"] = timeClient->getFormattedTime();
     serializeJson(jsonStatus, statusString);
 }

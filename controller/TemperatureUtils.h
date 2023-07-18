@@ -5,6 +5,7 @@
 #ifndef HOT_TUB_CONTROLLER_TEMPERATUREUTILS_H
 #define HOT_TUB_CONTROLLER_TEMPERATUREUTILS_H
 
+#include <sys/types.h>
 #include <TimeLib.h>
 
 // Temperature
@@ -30,6 +31,8 @@ private:
 public:
     void setup();
     void loop();
+    u_int8_t getTempC(u_int8_t sensorIndex);
+    u_int8_t getTempF(u_int8_t sensorIndex);
 
 };
 

@@ -19,11 +19,18 @@ void TemperatureUtils::loop() {
         Serial.print("Requesting temperatures...");
         sensors->requestTemperatures();
         Serial.print(" ... ");
-        Serial.println(sensors->getTempCByIndex(0));
+        Serial.println(sensors->getTempFByIndex(0));
 //        DeviceAddress device0;
 //        Serial.print("getting address...");
 //        sensors->getAddress(device0, 0);
 //        Serial.print("temp by adress...");
 //        Serial.println(sensors->getTempC(device0));
     }
+}
+
+u_int8_t TemperatureUtils::getTempC(u_int8_t sensorIndex) {
+    return sensors->getTempCByIndex(sensorIndex);
+}
+u_int8_t TemperatureUtils::getTempF(u_int8_t sensorIndex) {
+    return sensors->getTempFByIndex(sensorIndex);
 }
