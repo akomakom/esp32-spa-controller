@@ -97,6 +97,14 @@ public:
 };
 
 
+typedef struct {
+    // default is always off:
+    u_int8_t percentageOfDayOnTime = 0;
+    u_int8_t numberOfTimesToRun = 1; // stay on
+    u_int8_t normalValueOn = 1;
+    u_int8_t normalValueOff = 0;
+} SpaSchedulerNormalSettings;
+
 /**
  * A Scheduler that can be attached to any control
  * A control will consult the scheduler to see if the value should be schedule-based
@@ -156,10 +164,17 @@ public:
      */
     u_int8_t getScheduledValue();
 
+    void updateConfigJsonString();
+
+    void persist(const char* eepromKey);
+    void load(const char* eepromKey);
+
     // min and max bounds for value, for arg checking
     u_int8_t min = DEFAULT_MIN;
     u_int8_t max = DEFAULT_MAX;
 
+
+    char configString[150]; // for JSON output
 private:
     /**
      * Utility that will raise an exception for out of bounds
@@ -168,11 +183,8 @@ private:
     void checkBounds(u_int8_t value);
 
     static const u_int8_t SCHEDULER_DISABLED_VALUE = -1;
-    // default is always off:
-    u_int8_t percentageOfDayOnTime = 0;
-    u_int8_t numberOfTimesToRun = 1; // stay on
-    u_int8_t normalValueOn = 1;
-    u_int8_t normalValueOff = 0;
+
+    SpaSchedulerNormalSettings normalSettings;
 
     time_t overrideStartTime = now();
     time_t overrideEndTime = now();
@@ -182,6 +194,8 @@ private:
     // These are normally set by calling normalSchedule():
     float onOffLengthPercentage = 100; //defaults based on values of variables above (always off)
     float onVsOff = 0; //defaults based on values of variables above (always off)
+
+    StaticJsonDocument<150> jsonConfig;
 };
 
 class SpaControl : public SpaControlScheduler, public SpaControlDependencies {
@@ -202,8 +216,12 @@ public:
     const char *type;
     JsonObject jsonStatus;
 
+    void persist();
+    void load();
+
 private:
     void init(const char *name, u_int8_t min, u_int8_t max);
+    char persistKeyScheduler[20];
 
 protected:
     u_int8_t getNextValue(); // helper for toggle()

@@ -79,6 +79,26 @@ void setup(void) {
             sendJSONResponse(e.what(), 500);
         }
     });
+    server.on("/configureControl", HTTP_GET, []() {
+        SpaControl *control = spaStatus.findByName(server.arg("control").c_str());
+        control->updateConfigJsonString();
+        sendJSONResponse(control->configString);
+    });
+    server.on("/configureControl", HTTP_POST, []() {
+        try {
+            SpaControl *control = spaStatus.findByName(server.arg("control").c_str());
+            control->normalSchedule(
+                    (u_int8_t)server.arg("percentageOfDayOnTime").toInt(),
+                    (u_int8_t)server.arg("numberOfTimesToRun").toInt(),
+                    (u_int8_t)server.arg("normalValueOn").toInt(),
+                    (u_int8_t)server.arg("normalValueOff").toInt()
+            );
+            control->persist();
+            sendJSONResponse(WEB_RESPONSE_OK);
+        } catch (std::invalid_argument &e) {
+            sendJSONResponse(e.what(), 500);
+        }
+    });
 
     setupServerDefaultActions();
     server.begin();

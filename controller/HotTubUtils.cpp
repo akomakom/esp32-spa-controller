@@ -53,17 +53,41 @@ SpaControlScheduler::normalSchedule(u_int8_t percentageOfDayOnTime, u_int8_t num
                                     u_int8_t normalValueOff) {
     checkBounds(normalValueOn);
     checkBounds(normalValueOff);
-    this->percentageOfDayOnTime = std::max(0, std::min(100, (int)percentageOfDayOnTime));
-    this->numberOfTimesToRun = std::max(1, (int)numberOfTimesToRun);
-    this->normalValueOn = normalValueOn;
-    this->normalValueOff = normalValueOff;
+    normalSettings.percentageOfDayOnTime = std::max(0, std::min(100, (int)percentageOfDayOnTime));
+    normalSettings.numberOfTimesToRun = std::max(1, (int)numberOfTimesToRun);
+    normalSettings.normalValueOn = normalValueOn;
+    normalSettings.normalValueOff = normalValueOff;
 
     // precalculate normal schedule variables
-    float onLengthPercentage = (float)percentageOfDayOnTime / (float)numberOfTimesToRun;
-    float offLengthPercentage = (float)(100 - percentageOfDayOnTime) / (float)numberOfTimesToRun;
+    float onLengthPercentage = (float)normalSettings.percentageOfDayOnTime / (float)normalSettings.numberOfTimesToRun;
+    float offLengthPercentage = (float)(100 - normalSettings.percentageOfDayOnTime) / (float)normalSettings.numberOfTimesToRun;
     onOffLengthPercentage = onLengthPercentage + offLengthPercentage;
     // how ON compares with OFF (how far is the divider), as a 0-1 fraction, <0.5 is on, >0.5 is off
     onVsOff = onLengthPercentage / onOffLengthPercentage;
+
+}
+
+void SpaControlScheduler::persist(const char* eepromKey) {
+    // persist this to EEPROM
+    if (!app_preferences.putBytes(eepromKey, &normalSettings, sizeof(normalSettings))) {
+        Serial.print("Unable to persist setting to key: ");
+        Serial.println(eepromKey);
+    } else {
+        Serial.print("Persisted setting to key: ");
+        Serial.println(eepromKey);
+    }
+}
+void SpaControlScheduler::load(const char* eepromKey) {
+    SpaSchedulerNormalSettings settings;
+    Serial.print("Retrieving values from eeprom for key");
+    Serial.println(eepromKey);
+
+    if (app_preferences.getBytes(eepromKey, &settings, sizeof(settings))) {
+        // apply so that math can be precalculated
+        Serial.println("Retrieved values from eeprom, eg");
+        Serial.println(settings.percentageOfDayOnTime);
+        normalSchedule(settings.percentageOfDayOnTime, settings.numberOfTimesToRun, settings.normalValueOn, settings.normalValueOff);
+    }
 }
 
 void SpaControlScheduler::scheduleOverride(time_t startTime, time_t endTime, u_int8_t valueOverride) {
@@ -101,7 +125,7 @@ u_int8_t SpaControlScheduler::getScheduledValue() {
     float fractionOfOnOffUnit =  onOffUnitCount-(long)onOffUnitCount; //leave fraction only, eg 0.36
 
     // Are we past the on->off divider in this on-then-off time unit?
-    return (fractionOfOnOffUnit > onVsOff) ? normalValueOff : normalValueOn;
+    return (fractionOfOnOffUnit > onVsOff) ? normalSettings.normalValueOff : normalSettings.normalValueOn;
 }
 
 bool SpaControlScheduler::isOverrideScheduleEnabled() {
@@ -119,10 +143,21 @@ time_t SpaControlScheduler::getOverrideScheduleRemainingTime() {
     return 0;
 }
 
+
+void SpaControlScheduler::updateConfigJsonString() {
+    jsonConfig["percentageOfDayOnTime"] = normalSettings.percentageOfDayOnTime;
+    jsonConfig["numberOfTimesToRun"] = normalSettings.numberOfTimesToRun;
+    jsonConfig["normalValueOn"] = normalSettings.normalValueOn;
+    jsonConfig["normalValueOff"] = normalSettings.normalValueOff;
+    serializeJson(jsonConfig, configString);
+}
+
+
 /*** SpaControl ***/
 SpaControl::SpaControl(const char *name, const char *type) {
     this->name = name;
     this->type = type;
+    sprintf(this->persistKeyScheduler, "ctrl_sch_%s", name);
 }
 
 void SpaControl::toggle() {
@@ -151,6 +186,16 @@ u_int8_t SpaControl::getNextValue() {
     } else {
         return getEffectiveValue() + 1;
     }
+}
+
+void SpaControl::persist() {
+    SpaControlScheduler::persist(persistKeyScheduler);
+}
+
+void SpaControl::load() {
+    Serial.print("Loading settings for control ");
+    Serial.println(name);
+    SpaControlScheduler::load(persistKeyScheduler);
 }
 
 
@@ -215,18 +260,7 @@ void SensorBasedControl::applyOutputs() {
 /*** SpaStatus ***/
 
 SpaStatus::SpaStatus() {
-    timeClient = new NTPClient(ntpUDP, "pool.ntp.org", 0, 3600000);
 
-    // Behavior
-    pump->normalSchedule(50, 2, 1, 0); // TODO: Save preferences and build a UI to modify
-    heater->normalSchedule(100, 1, heater->max, heater->min); // always on, set to 105F
-    pump->neededBy(heater, 1, 1);
-    ozone->lockedTo(pump, SpaControlDependencies::SPECIAL_VALUE_ANY_GREATER_THAN_ZERO, 1);
-
-    // JSON init
-    for (SpaControl *control: controls) {
-        control->jsonStatus = jsonStatusControls.createNestedObject();
-    }
 }
 
 void SpaStatus::updateStatusString() {
@@ -259,10 +293,23 @@ SpaControl *SpaStatus::findByName(const char *name) {
 }
 
 void SpaStatus::setup() {
-
+    timeClient = new NTPClient(ntpUDP, "pool.ntp.org", 0, 3600000);
     timeClient->begin();
-    temperatureUtils.setup();
 
+    // Defaults:
+    pump->normalSchedule(50, 2, 1, 0); // TODO: Save preferences and build a UI to modify
+    heater->normalSchedule(100, 1, heater->max, heater->min); // always on, set to max temp
+    pump->neededBy(heater, 1, 1);
+    ozone->lockedTo(pump, SpaControlDependencies::SPECIAL_VALUE_ANY_GREATER_THAN_ZERO, 1);
+
+    Serial.println("About to iterate and load settings");
+    // apply saved preferences
+    // JSON init
+    for (SpaControl *control: controls) {
+        control->load();
+        control->jsonStatus = jsonStatusControls.createNestedObject();
+    }
+    temperatureUtils.setup();
 }
 
 void SpaStatus::loop() {
