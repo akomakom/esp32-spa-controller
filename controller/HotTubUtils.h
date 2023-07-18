@@ -9,7 +9,6 @@
 #include <vector>
 #include "pgmspace.h"
 #include <stdexcept>
-#include <Preferences.h>
 #include <ArduinoJson.h>
 #include <TimeLib.h>
 #include <TimeAlarms.h>
@@ -18,7 +17,9 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 
+#include "core.h"
 #include "TemperatureUtils.h"
+
 
 // needs to be large enough to allocate json document and string representation
 #define STATUS_LENGTH 1000
@@ -34,7 +35,6 @@ const int RELAY_PIN_7 = 12;
 const int RELAY_PIN_8 = 13;
 const int LED_PIN = 23;
 
-extern Preferences app_preferences;
 
 
 class SpaSensor {
@@ -259,8 +259,6 @@ private:
 public:
     SpaStatus();
 
-//    SpaControl *pump = new SimpleSpaControl("pump", RELAY_PIN_1);
-//    SpaControl *pump_fast = new SimpleSpaControl("pump_fast", RELAY_PIN_2);
     SpaControl* pump = new TwoSpeedSpaControl("pump", RELAY_PIN_1, RELAY_PIN_2);
     SpaControl* blower = new SimpleSpaControl("blower", RELAY_PIN_3);
     SpaControl* heater = new SensorBasedControl("heater", RELAY_PIN_4, 0, &temperatureUtils);

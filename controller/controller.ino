@@ -17,8 +17,9 @@ const long statusSendinterval = 10000;        // Interval at which to publish se
 void setup(void) {
     Serial.begin(115200);
 
-    app_preferences.begin("hot-tub");
-
+    if (!app_preferences.begin("hot-tub")) {
+        Serial.println("Unable to open preferences");
+    }
     // while(!Serial);
 
     // To support ESP-NOW
