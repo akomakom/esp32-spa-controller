@@ -25,13 +25,13 @@ void SpaControlDependencies::lockedTo(SpaControl *otherControl, u_int8_t otherCo
 u_int8_t SpaControlDependencies::getDependencyValue(SpaControl* other, u_int8_t otherValue, u_int8_t ourValue) {
     u_int8_t result = SPECIAL_RETURN_VALUE_NOT_IN_EFFECT;
     if (other != NULL) {
-        if (otherValue == other->getEffectiveValue()) {
+        if (otherValue == other->getEffectiveValueForDependents()) {
             result = ourValue;
-        } else if (otherValue == SPECIAL_VALUE_ANY_GREATER_THAN_ZERO && other->getEffectiveValue() > 0) {
+        } else if (otherValue == SPECIAL_VALUE_ANY_GREATER_THAN_ZERO && other->getEffectiveValueForDependents() > 0) {
             result = ourValue;
         }
         if (result == SPECIAL_VALUE_ANY_GREATER_THAN_ZERO) {
-            result = other->getEffectiveValue(); // use the same value for us
+            result = other->getEffectiveValueForDependents(); // use the same value for us
         }
     }
     return result;
@@ -178,6 +178,10 @@ u_int8_t SpaControl::getEffectiveValue() {
     return getScheduledValue();
 }
 
+u_int8_t SpaControl::getEffectiveValueForDependents() {
+    return getEffectiveValue();
+}
+
 void SpaControl::applyOutputs() {}
 
 u_int8_t SpaControl::getNextValue() {
@@ -252,8 +256,16 @@ SensorBasedControl::SensorBasedControl(const char *name, u_int8_t pin, u_int8_t 
     pinMode(pin, OUTPUT);
 }
 
+/**
+ * Dependents don't care obout our temperature threshold, they care whether we are on or off
+ * @return
+ */
+u_int8_t SensorBasedControl::getEffectiveValueForDependents() {
+    return (getEffectiveValue() > temperatureUtils->getTempF(this->sensorIndex)) ? 1 : 0;
+}
+
 void SensorBasedControl::applyOutputs() {
-    digitalWrite(pin, (getEffectiveValue() > temperatureUtils->getTempF(this->sensorIndex)) ? HIGH : LOW);
+    digitalWrite(pin,  getEffectiveValueForDependents() ? HIGH : LOW);
 }
 
 
@@ -271,6 +283,7 @@ void SpaStatus::updateStatusString() {
         control->jsonStatus["max"] = control->max;
         control->jsonStatus["type"] = control->type;
         control->jsonStatus["ORT"] = control->getOverrideScheduleRemainingTime();
+        control->jsonStatus["depval"] = control->getDependencyValue();
     }
 
     jsonStatusMetrics["temp"] = temperatureUtils.getTempF(0);

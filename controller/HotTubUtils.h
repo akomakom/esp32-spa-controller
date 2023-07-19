@@ -210,6 +210,13 @@ public:
      */
     virtual u_int8_t getEffectiveValue();
 
+    /**
+     * For some cotrols (eg SensorBased), effective value doesn't translate to
+     * "is on" very easily
+     * @return a consistent value, same as getEffectiveValue for simple controls
+     */
+    virtual u_int8_t getEffectiveValueForDependents();
+
     virtual void applyOutputs();
 
     const char *name;
@@ -259,6 +266,7 @@ class SensorBasedControl: public SpaControl {
 public:
     SensorBasedControl(const char *name, u_int8_t pin, u_int8_t sensorIndex, TemperatureUtils* temps);
     virtual void applyOutputs();
+    virtual u_int8_t getEffectiveValueForDependents();
 
     u_int8_t pin;
     u_int8_t sensorIndex;

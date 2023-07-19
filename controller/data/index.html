@@ -118,17 +118,36 @@
         $('#duration-options').append(option);
       });
 
+      let validate = function(input, min, max) {
+        if (input.val() >= min && input.val() <= max) {
+          input.removeClass('error');
+        } else {
+          input.addClass('error');
+        }
+      }
 
       let configControlHandler = function(event) {
         controlName = $(this).parents().attr('name');
+        let controlData = $(this).parents().data('status');
         event.stopPropagation();
 
         $.getJSON( "configureControl?control=" + controlName, function( data ) {
 
 
           $("#control-config-dialog-form").find('input').each(function(index, input) {
+            // assign input field values by matching ids to json property names
             $(input).val(data[$(input).attr('id')]);
           });
+          $("#control-config-dialog-form").find('input.validate-min-max')
+                  .attr('min', controlData['min'])
+                  .attr('max', controlData['max'])
+                  .on('change keyup paste', function() {
+                    validate($(this), controlData['min'], controlData['max']);
+                  });
+
+          $("#control-config-dialog-form").find('.min').text(controlData['min']);
+          $("#control-config-dialog-form").find('.max').text(controlData['max']);
+
           let status = $( "#control-config-dialog-form .status" );
 
           let dialog = $( "#control-config-dialog-form" ).dialog({
@@ -143,7 +162,6 @@
                 $("#control-config-dialog-form").find('input').each(function(index, input) {
                   data[$(input).attr('id')] = $(input).val();
                 });
-
 
                 $.ajax({
                   type: "POST",
@@ -320,6 +338,8 @@
         });
       };
 
+
+
       updateStatus();
       setInterval(updateStatus, 5000);
     });
@@ -362,14 +382,16 @@
 <div id="control-config-dialog-form" class="dialog-template" title="Configure Control">
   <h2>Configure Normal (Daily) Schedule</h2>
   <form>
-    <input type="text" id="percentageOfDayOnTime"/>
+    <input type="number" id="percentageOfDayOnTime" class="validate-percent" min="0" max="100"/>
     <label for="percentageOfDayOnTime">Percentage Of Day This Control Should Be "ON"</label><br>
-    <input type="text" id="numberOfTimesToRun"/>
+    <input type="number" id="numberOfTimesToRun" class="validate-unsigned" min="0"/>
     <label for="numberOfTimesToRun">Number of "ON" periods during a day</label><br>
-    <input type="text" id="normalValueOn"/>
-    <label for="normalValueOn">"ON" is</label><br>
-    <input type="text" id="normalValueOff"/>
-    <label for="normalValueOff">"OFF" is</label><br>
+    <input type="number" id="normalValueOn" class="validate-min-max"/>
+    <label for="normalValueOn">* Value of control when scheduled to be "ON"</label><br>
+    <input type="number" id="normalValueOff" class="validate-min-max"/>
+    <label for="normalValueOff">* Value of control when scheduled to be "OFF"</label><br>
+    <div>*Valid values are <span class="min"></span> to <span class="max"></span></div>
+
   </form>
   <span class="status"></span>
 </div>
