@@ -98,9 +98,9 @@ void TemperatureUtils::loop() {
     }
 }
 
-u_int8_t TemperatureUtils::getTempC(u_int8_t sensorIndex) {
+float TemperatureUtils::getTempC(u_int8_t sensorIndex) {
     return sensors->getTempCByIndex(sensorIndex);
 }
-u_int8_t TemperatureUtils::getTempF(u_int8_t sensorIndex) {
+float TemperatureUtils::getTempF(u_int8_t sensorIndex) {
     return sensors->getTempFByIndex(sensorIndex);
 }

@@ -46,6 +46,14 @@ u_int8_t SpaControlDependencies::getDependencyValue() {
     return result;
 }
 
+SpaControl *SpaControlDependencies::getDependentControl() {
+    if (lockedToOtherControl != NULL) {
+        return lockedToOtherControl;
+    } else if (neededByOtherControl != NULL) {
+        return neededByOtherControl;
+    }
+}
+
 
 /*** SpaControlScheduler ***/
 void
@@ -246,11 +254,12 @@ void TwoSpeedSpaControl::applyOutputs() {
     }
 }
 
-SensorBasedControl::SensorBasedControl(const char *name, u_int8_t pin, u_int8_t sensorIndex, TemperatureUtils* temps) : SpaControl(name, "sensor-based") {
+SensorBasedControl::SensorBasedControl(const char *name, u_int8_t pin, u_int8_t sensorIndex, u_int8_t swing, TemperatureUtils* temps) : SpaControl(name, "sensor-based") {
     this->pin = pin;
     this->sensorIndex = sensorIndex;
     this->min = 60; // using Fahrenheit because there is better resolution with integers
     this->max = 105;
+    this->swing = swing;
     this->temperatureUtils = temps;
 
     pinMode(pin, OUTPUT);
@@ -261,11 +270,26 @@ SensorBasedControl::SensorBasedControl(const char *name, u_int8_t pin, u_int8_t 
  * @return
  */
 u_int8_t SensorBasedControl::getEffectiveValueForDependents() {
-    return (getEffectiveValue() > temperatureUtils->getTempF(this->sensorIndex)) ? 1 : 0;
+    // Don't just flip/flop any time temperature is below threshold.
+    // Instead:
+    //  if currently off and we are colder than (threshold - swing), turn on
+    //  if currently on and we are hotter than (threshold + swing), turn off.
+    //  if within threshold+/- swing, stay where you are
+
+    // Delta to where we want to be, positive is too hot, negative is too cold:
+    float delta = temperatureUtils->getTempF(this->sensorIndex) - (float)getEffectiveValue();
+    // Are we outside of the swing deadband (setpoint-swing to setpoint+swing)?
+    if (std::abs(delta) > swing) {
+        // too hot or too cold and outside deadband, turn on or off regardless:
+        slowFlipState = (delta > 0) ? false : true;
+    } else {
+        // within deadband, do not change state
+    }
+    return slowFlipState ? 1 : 0;
 }
 
 void SensorBasedControl::applyOutputs() {
-    digitalWrite(pin,  getEffectiveValueForDependents() ? HIGH : LOW);
+    digitalWrite(pin, getEffectiveValueForDependents());
 }
 
 
@@ -283,7 +307,10 @@ void SpaStatus::updateStatusString() {
         control->jsonStatus["max"] = control->max;
         control->jsonStatus["type"] = control->type;
         control->jsonStatus["ORT"] = control->getOverrideScheduleRemainingTime();
-        control->jsonStatus["depval"] = control->getDependencyValue();
+        if (control->getDependentControl() != NULL) {
+            control->jsonStatus["depctl"] = control->getDependentControl()->name;
+            control->jsonStatus["depval"] = control->getDependencyValue();
+        }
     }
 
     jsonStatusMetrics["temp"] = temperatureUtils.getTempF(0);

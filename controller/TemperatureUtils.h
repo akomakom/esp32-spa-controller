@@ -47,8 +47,8 @@ private:
 public:
     void setup();
     void loop();
-    u_int8_t getTempC(u_int8_t sensorIndex);
-    u_int8_t getTempF(u_int8_t sensorIndex);
+    float getTempC(u_int8_t sensorIndex);
+    float getTempF(u_int8_t sensorIndex);
     float getTempFByID(u_int8_t id);
 };
 

@@ -70,7 +70,7 @@
     .dialog-template {
       display: none;
     }
-    .spacontrol .control-configure {
+    .spacontrol .top-right-icons {
       position: absolute;
       top: 1px;
       right: 1px;
@@ -127,8 +127,8 @@
       }
 
       let configControlHandler = function(event) {
-        controlName = $(this).parents().attr('name');
-        let controlData = $(this).parents().data('status');
+        controlName = $(this).parents('.spacontrol').attr('name');
+        let controlData = $(this).parents('.spacontrol').data('status');
         event.stopPropagation();
 
         $.getJSON( "configureControl?control=" + controlName, function( data ) {
@@ -284,6 +284,10 @@
               control.data('status', controlData);
               control.find('.control-configure').on('click', configControlHandler);
 
+              control.find('.control-dependent')
+                      .toggle(controlData['depctl'] != null)
+                      .attr('title', "Depends on " + controlData['depctl'] + " and may turn on when required");
+
               switch(controlData['type']) {
                 case 'sensor-based':
                   // TODO: unhardcode default duration
@@ -357,8 +361,11 @@
 <div id="templates" style="display: none">
   <div class="spacontrol">
     <div class="control-name"></div>
-    <div class="control-configure">&#9881;</div>
-      <div class="button-row">
+    <div class="top-right-icons">
+      <span class="control-dependent" title="Depends on another control">&#x2942;</span>
+      <span class="control-configure">&#9881;</span>
+    </div>
+    <div class="button-row">
       <button type="button" class="control-incremental minus">-</button>
       <button type="button" class="control">
         <span class="control-state"></span>

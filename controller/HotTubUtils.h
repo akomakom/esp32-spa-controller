@@ -94,6 +94,13 @@ public:
      *  or SPECIAL_RETURN_VALUE_NOT_IN_EFFECT
      */
     u_int8_t getDependencyValue();
+
+    /**
+     * If either neededBy or lockedTo was called, returns the dependent control.
+     * Otherwise, returns NULL.
+     * @return
+     */
+    SpaControl* getDependentControl();
 };
 
 
@@ -264,13 +271,19 @@ public:
 
 class SensorBasedControl: public SpaControl {
 public:
-    SensorBasedControl(const char *name, u_int8_t pin, u_int8_t sensorIndex, TemperatureUtils* temps);
+    SensorBasedControl(const char *name, u_int8_t pin, u_int8_t sensorIndex, u_int8_t swing, TemperatureUtils* temps);
     virtual void applyOutputs();
     virtual u_int8_t getEffectiveValueForDependents();
 
     u_int8_t pin;
     u_int8_t sensorIndex;
+
+    float swing; // +/- threshold before kicking on
+
     TemperatureUtils* temperatureUtils;
+private:
+    bool slowFlipState = false; // for swing feature
+
 };
 
 class SpaStatus {
@@ -287,7 +300,7 @@ public:
 
     SpaControl* pump = new TwoSpeedSpaControl("pump", RELAY_PIN_1, RELAY_PIN_2);
     SpaControl* blower = new SimpleSpaControl("blower", RELAY_PIN_3);
-    SpaControl* heater = new SensorBasedControl("heater", RELAY_PIN_4, 0, &temperatureUtils);
+    SpaControl* heater = new SensorBasedControl("heater", RELAY_PIN_4, 0, 1, &temperatureUtils);
     SpaControl* ozone = new SimpleSpaControl("ozone", RELAY_PIN_5);
     SpaControl* light = new SimpleSpaControl("light", RELAY_PIN_6);
 
