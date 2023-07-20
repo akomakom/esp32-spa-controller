@@ -29,6 +29,7 @@
     .spacontrol .control-name {
       text-transform: capitalize;
       text-align: center;
+      font-size: 70px;
     }
 
     button {
@@ -75,6 +76,37 @@
       top: 1px;
       right: 1px;
     }
+
+
+
+    #spastatus {
+      /*width: 1920px;*/
+      /*height: 1080px;*/
+      /*min-height: 200px;*/
+      position: relative;
+      /*background: #191919;*/
+      display: flex;
+      margin-bottom: 10px;
+    }
+
+    #spastatus .metric-widget {
+      /*position: absolute;*/
+      border-radius: 4px;
+      overflow: hidden;
+      box-sizing: border-box;
+      border: 10px solid #191919;
+      padding: 15px;
+      text-align: center;
+      background: #31343B;
+      color: #fff;
+    }
+    #spastatus .metric-widget .label {  color: #a6a6a6; }
+
+    #spastatus .title, #spastatus .value { margin-bottom: 12px; text-transform: uppercase; }
+    #spastatus .title { font-size: 30px; font-weight: 400; }
+    #spastatus .value { font-size: 80px; font-weight: 700;}
+    #spastatus .label { font-size: 30px; text-transform: uppercase; font-weight: 400;}
+
 
   </style>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
@@ -249,7 +281,9 @@
         $.getJSON( "status", function( data ) {
 
 
-          $('#temp').text(data.metrics.temp);
+          $('.metric-widget#water .value').text(Number(data.metrics.temp).toFixed(2));
+          $('.metric-widget#time .value').text(data.metrics.time || '?');
+          $('.metric-widget#uptime .value').text(humanizeDuration(data.metrics.uptime*1000, {largest: 1, round: true}));
 
           $.each(data.controls, function(index, controlData) {
             let control  = $(`#spacontrols .spacontrol[name="${controlData['name']}"]`);
@@ -352,8 +386,28 @@
 </head>
 <body>
 <div id="spastatus">
-  Water Temperature:
-  <span id="temp"></span>F
+  <div class="metric-widget" id="water">
+    <div class="title">Water</div>
+    <div class="data">
+      <div class="value">--</div>
+      <div class="label">&deg;F</div>
+    </div>
+  </div>
+  <div class="metric-widget" id="time">
+    <div class="title">Time</div>
+    <div class="data">
+      <div class="value">--</div>
+      <div class="label">on device</div>
+    </div>
+  </div>
+  <div class="metric-widget" id="uptime">
+    <div class="title">Uptime</div>
+    <div class="data">
+      <div class="value">--</div>
+      <div class="label">on device</div>
+    </div>
+  </div>
+
 </div>
 <div id="spacontrols">
 </div>

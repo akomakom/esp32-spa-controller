@@ -29,25 +29,27 @@ void setup(void) {
     WiFi.begin(WIFI_NAME, WIFI_PASS);
     Serial.println("");
 
+    Serial.print("Connnecting to WiFi SSID: ");
+    Serial.println(WIFI_NAME);
     // Wait for connection
     // TODO: probably a bad idea
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
-    }
+//    while (WiFi.status() != WL_CONNECTED) {
+//        delay(500);
+//        Serial.print(".");
+//    }
     Serial.println("");
     Serial.print("Connected to ");
     Serial.println(WIFI_NAME);
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
 
-    /*use mdns for host name resolution*/
-    if (!MDNS.begin(WIFI_HOST)) { //http://esp32.local
-        Serial.println("Error setting up MDNS responder!");
-        while (1) {
-            delay(1000);
-        }
-    }
+//    /*use mdns for host name resolution*/
+//    if (!MDNS.begin(WIFI_HOST)) { //http://esp32.local
+//        Serial.println("Error setting up MDNS responder!");
+//        while (1) {
+//            delay(1000);
+//        }
+//    }
 
     SPIFFS.begin();
     Serial.println("mDNS responder started");

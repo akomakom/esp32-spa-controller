@@ -6,6 +6,7 @@ BAUD ?= 115200
 PORT ?= /dev/ttyUSB0
 FQBN ?= esp32:esp32:esp32
 FQBN_PATH = $(shell echo ${FQBN} | tr : .)
+INO = $(shell echo *.ino | head -n 1)
 #MKSPIFFS ?= /opt/arduino-cli/mkspiffs
 #SPIFFS_OUTPUT_FILE=build/spiffs.bin
 
@@ -18,7 +19,7 @@ hot_tub_types.h:
 	ln -s ../hot_tub_types.h .
 
 compile: secrets.h hot_tub_types.h
-	${ARDUINO_CLI} compile --fqbn ${FQBN} .
+	${ARDUINO_CLI} compile --fqbn ${FQBN} -e .
 
 # TBD
 #spiffs:
@@ -28,6 +29,10 @@ compile: secrets.h hot_tub_types.h
 # Upload the firmware
 upload: compile
 	 ${ARDUINO_CLI} upload -p ${PORT} --fqbn ${FQBN} --discovery-timeout 30s . -v
+
+# POST binary firmware to /upload endpoint instead of via USB
+upload-via-http: compile
+	curl -v --progress-bar -F update=@build/${FQBN_PATH}/${INO}.bin http://${TARGET_IP}/update
 
 # Serial console of the board
 monitor:

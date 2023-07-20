@@ -23,6 +23,23 @@ void TemperatureUtils::printAddress(DeviceAddress deviceAddress)
     }
 }
 
+void TemperatureUtils::readTemperatures() {
+    Serial.print("Requesting temperatures...");
+    sensors->requestTemperatures();
+    Serial.print(" ... ");
+
+    //init cache
+    for (u_int8_t i = 0 ; i < sensors->getDeviceCount(); i++) {
+        float temp = sensors->getTempFByIndex(i);
+        if (temp < MINIMUM_VALID_TEMP_F || temp > MAXIMUM_VALID_TEMP_F) {
+            Serial.print("Invalid temperature reading: ");
+            Serial.println(temp);
+        } else {
+            temperatureCache[i] = temp;
+        }
+        Serial.println(temperatureCache[i]);
+    }
+}
 
 void TemperatureUtils::setup() {
     this->oneWire = new OneWire(ONE_WIRE_BUS);
@@ -34,6 +51,13 @@ void TemperatureUtils::setup() {
     Serial.print("Found ");
     Serial.print(sensors->getDeviceCount(), DEC);
     Serial.println(" devices.");
+
+    // temporary:
+    temperatureCache.push_back(0); //put in an initial value for first sensor
+    temperatureCache.assign(sensors->getDeviceCount(), 0);  // and others as well, if any
+    readTemperatures(); // ensure we have some data
+
+
 
 
     /***** This is not yet used *****/
@@ -86,10 +110,7 @@ void TemperatureUtils::setup() {
 void TemperatureUtils::loop() {
     if (now() > (temperatureRequestedTime + TEMPERATURE_REQUEST_FREQUENCY)) {
         temperatureRequestedTime = now();
-        Serial.print("Requesting temperatures...");
-        sensors->requestTemperatures();
-        Serial.print(" ... ");
-        Serial.println(sensors->getTempFByIndex(0));
+        readTemperatures();
 //        DeviceAddress device0;
 //        Serial.print("getting address...");
 //        sensors->getAddress(device0, 0);
@@ -98,9 +119,9 @@ void TemperatureUtils::loop() {
     }
 }
 
-float TemperatureUtils::getTempC(u_int8_t sensorIndex) {
-    return sensors->getTempCByIndex(sensorIndex);
-}
+//float TemperatureUtils::getTempC(u_int8_t sensorIndex) {
+//    return sensors->getTempCByIndex(sensorIndex);
+//}
 float TemperatureUtils::getTempF(u_int8_t sensorIndex) {
-    return sensors->getTempFByIndex(sensorIndex);
+    return temperatureCache[sensorIndex];
 }

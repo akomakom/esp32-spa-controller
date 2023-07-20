@@ -315,6 +315,7 @@ void SpaStatus::updateStatusString() {
 
     jsonStatusMetrics["temp"] = temperatureUtils.getTempF(0);
     jsonStatusMetrics["time"] = timeClient->getFormattedTime();
+    jsonStatusMetrics["uptime"] = esp_timer_get_time() / 1000000;
     serializeJson(jsonStatus, statusString);
 }
 
