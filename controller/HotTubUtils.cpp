@@ -4,6 +4,8 @@
 
 
 extern Preferences app_preferences = Preferences();
+WiFiUDP ntpUDP;
+extern NTPClient *timeClient = new NTPClient(ntpUDP, "pool.ntp.org", 0, 3600000);
 
 /*** SpaControlDependencies ***/
 
@@ -125,7 +127,9 @@ u_int8_t SpaControlScheduler::getScheduledValue() {
     // length of each unit as a percentage of day length
 
     // How far are we into the day (since midnight), in percentages?
-    float currentPercentageOfDay = (float)100 * elapsedSecsToday(now()) / SECS_PER_DAY;
+    float currentPercentageOfDay = (float)100 * elapsedSecsToday(timeClient->getEpochTime()) / SECS_PER_DAY;
+    Serial.print("Current percentage of day: ");
+    Serial.println(currentPercentageOfDay);
     // which segment are we in currently?
     // how many on+off time units into the day are we?
     // eg we are 2.36 on/off segments into the day
@@ -307,14 +311,14 @@ void SpaStatus::updateStatusString() {
         control->jsonStatus["max"] = control->max;
         control->jsonStatus["type"] = control->type;
         control->jsonStatus["ORT"] = control->getOverrideScheduleRemainingTime();
+        control->jsonStatus["eval"] = control->getEffectiveValueForDependents();
         if (control->getDependentControl() != NULL) {
             control->jsonStatus["depctl"] = control->getDependentControl()->name;
-            control->jsonStatus["depval"] = control->getDependencyValue();
         }
     }
 
     jsonStatusMetrics["temp"] = temperatureUtils.getTempF(0);
-    jsonStatusMetrics["time"] = timeClient->getFormattedTime();
+    jsonStatusMetrics["time"] = timeClient->getEpochTime();
     jsonStatusMetrics["uptime"] = esp_timer_get_time() / 1000000;
     serializeJson(jsonStatus, statusString);
 }
@@ -334,7 +338,6 @@ SpaControl *SpaStatus::findByName(const char *name) {
 }
 
 void SpaStatus::setup() {
-    timeClient = new NTPClient(ntpUDP, "pool.ntp.org", 0, 3600000);
     timeClient->begin();
 
     // Defaults:

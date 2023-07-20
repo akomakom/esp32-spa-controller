@@ -7,6 +7,11 @@
 
 #include <Preferences.h>
 
+// NTP stuff
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+
 extern Preferences app_preferences;
+extern NTPClient *timeClient;
 
 #endif //HOT_TUB_CONTROLLER_CORE_H

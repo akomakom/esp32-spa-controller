@@ -13,9 +13,6 @@
 #include <TimeLib.h>
 #include <TimeAlarms.h>
 
-// NTP stuff
-#include <NTPClient.h>
-#include <WiFiUdp.h>
 
 #include "core.h"
 #include "TemperatureUtils.h"
@@ -292,8 +289,7 @@ private:
     JsonArray jsonStatusControls = jsonStatus.createNestedArray("controls");
     JsonObject jsonStatusMetrics = jsonStatus.createNestedObject("metrics");
     TemperatureUtils temperatureUtils;
-    WiFiUDP ntpUDP;
-    NTPClient *timeClient;
+
 
 public:
     SpaStatus();

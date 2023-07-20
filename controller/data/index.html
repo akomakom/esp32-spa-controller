@@ -77,6 +77,9 @@
       right: 1px;
     }
 
+    .spacontrol .control-power-state {
+      font-size: 20px;
+    }
 
 
     #spastatus {
@@ -282,7 +285,9 @@
 
 
           $('.metric-widget#water .value').text(Number(data.metrics.temp).toFixed(2));
-          $('.metric-widget#time .value').text(data.metrics.time || '?');
+          let time = new Date(data.metrics.time * 1000);
+          $('.metric-widget#time .value').text(time.toLocaleTimeString());
+          $('.metric-widget#time .label').text(time.toLocaleDateString());
           $('.metric-widget#uptime .value').text(humanizeDuration(data.metrics.uptime*1000, {largest: 1, round: true}));
 
           $.each(data.controls, function(index, controlData) {
@@ -370,8 +375,13 @@
             control.find('.control-state').text(valNames[controlData['value']]);
             control.find('.scheduler-ort').text(humanizeDuration(controlData['ORT'] * 1000,  { round: true, largest: 1  }));
             scheduler.toggle(controlData['ORT'] > 0);
-          });
 
+            // 250+ is special
+            let isOn = controlData['eval'] > 0;
+            control.find('.control-is-on').toggle(isOn);
+            control.find('.control-is-off').toggle(!isOn);
+
+          });
 
         });
       };
@@ -404,7 +414,7 @@
     <div class="title">Uptime</div>
     <div class="data">
       <div class="value">--</div>
-      <div class="label">on device</div>
+      <div class="label">since boot</div>
     </div>
   </div>
 
@@ -416,6 +426,8 @@
   <div class="spacontrol">
     <div class="control-name"></div>
     <div class="top-right-icons">
+      <span class="control-power-state control-is-on" title="Control is currently ON">&#x1F7E2;</span>
+      <span class="control-power-state control-is-off" title="Control is currently OFF">&#x26AA;</span>
       <span class="control-dependent" title="Depends on another control">&#x2942;</span>
       <span class="control-configure">&#9881;</span>
     </div>
