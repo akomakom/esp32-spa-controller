@@ -30,7 +30,6 @@ private:
     inline static esp_now_peer_info_t slave;
     inline static int chan;
 
-    enum MessageType {PAIRING, COMMAND, CONTROL_STATUS, METRICS_STATUS};
     static MessageType messageType;
 
     inline static int counter = 0;

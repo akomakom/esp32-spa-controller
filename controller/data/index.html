@@ -186,6 +186,7 @@
           let status = $( "#control-config-dialog-form .status" );
 
           let dialog = $( "#control-config-dialog-form" ).dialog({
+            title: `Configure Schedule for ${controlName}`,
 //                  autoOpen: false,
             height:'auto', width:'auto',
             modal: true,
@@ -286,7 +287,7 @@
 
           $('.metric-widget#water .value').text(Number(data.metrics.temp).toFixed(2));
           let time = new Date(data.metrics.time * 1000);
-          $('.metric-widget#time .value').text(time.toLocaleTimeString());
+          $('.metric-widget#time .value').text(time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),);
           $('.metric-widget#time .label').text(time.toLocaleDateString());
           $('.metric-widget#uptime .value').text(humanizeDuration(data.metrics.uptime*1000, {largest: 1, round: true}));
 
@@ -426,8 +427,8 @@
   <div class="spacontrol">
     <div class="control-name"></div>
     <div class="top-right-icons">
-      <span class="control-power-state control-is-on" title="Control is currently ON">&#x1F7E2;</span>
-      <span class="control-power-state control-is-off" title="Control is currently OFF">&#x26AA;</span>
+      <span class="control-power-state control-is-on" title="Currently ON">&#x1F534;</span>
+      <span class="control-power-state control-is-off" title="Currently OFF">&#x26AA;</span>
       <span class="control-dependent" title="Depends on another control">&#x2942;</span>
       <span class="control-configure">&#9881;</span>
     </div>

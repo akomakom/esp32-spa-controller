@@ -5,7 +5,7 @@
 #ifndef HOT_TUB_CONTROLLER_HOT_TUB_TYPES_H
 #define HOT_TUB_CONTROLLER_HOT_TUB_TYPES_H
 
-
+enum MessageType {PAIRING, COMMAND, CONTROL_STATUS, METRICS_STATUS};
 // Structure to receive data
 // Must match the sender structure
 typedef struct struct_command {
