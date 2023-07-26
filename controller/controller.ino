@@ -63,6 +63,7 @@ void setup(void) {
         const char *response = WEB_RESPONSE_OK;
         try {
             spaStatus.findByName(server.arg("control").c_str())->toggle();
+            previousStatusSendTime = 0; // update all others
             sendJSONResponse(WEB_RESPONSE_OK);
         } catch (std::invalid_argument &e) {
             sendJSONResponse(e.what(), 500);
@@ -76,6 +77,7 @@ void setup(void) {
             time_t end   = now() + (time_t)server.arg("duration").toInt();
             u_int8_t value = (u_int8_t)server.arg("value").toInt();
             spaStatus.findByName(server.arg("control").c_str())->scheduleOverride(start, end, value);
+            previousStatusSendTime = 0; //update all others
             sendJSONResponse(WEB_RESPONSE_OK);
         } catch (std::invalid_argument &e) {
             sendJSONResponse(e.what(), 500);
@@ -96,6 +98,7 @@ void setup(void) {
                     (u_int8_t)server.arg("normalValueOff").toInt()
             );
             control->persist();
+            previousStatusSendTime = 0; // update others
             sendJSONResponse(WEB_RESPONSE_OK);
         } catch (std::invalid_argument &e) {
             sendJSONResponse(e.what(), 500);

@@ -118,6 +118,8 @@ static void btn_event_cb(lv_event_t * e)
         lv_obj_t * label = lv_obj_get_child(btn, 0);
         lv_label_set_text_fmt(label, "Button: %d", cnt);
     }
+
+    ESPNowUtils::sendOverrideCommand(0, 0, 30, 1);
 }
 
 #endif
