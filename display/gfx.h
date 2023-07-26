@@ -29,7 +29,7 @@
 #include <Arduino_GFX_Library.h>
 #define TFT_BL 2
 #define GFX_BL DF_GFX_BL // default backlight pin, you may replace DF_GFX_BL to actual backlight pin
-
+#define GFX_FRAME_BUFFER_FRACTION 4 // divide size of width * height * color by this factor and allocate that many bytes
 
 /* More dev device declaration: https://github.com/moononournation/Arduino_GFX/wiki/Dev-Device-Declaration */
 #if defined(DISPLAY_DEV_KIT)
@@ -136,14 +136,14 @@ void gfx_init() {
     screenWidth = gfx->width();
     screenHeight = gfx->height();
 #ifdef ESP32
-    disp_draw_buf = (lv_color_t *)heap_caps_malloc(sizeof(lv_color_t) * screenWidth * screenHeight/4 , MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    disp_draw_buf = (lv_color_t *)heap_caps_malloc(sizeof(lv_color_t) * screenWidth * screenHeight/GFX_FRAME_BUFFER_FRACTION , MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
 #else
-    disp_draw_buf = (lv_color_t *) malloc(sizeof(lv_color_t) * screenWidth * screenHeight / 4);
+    disp_draw_buf = (lv_color_t *) malloc(sizeof(lv_color_t) * screenWidth * screenHeight / GFX_FRAME_BUFFER_FRACTION);
 #endif
     if (!disp_draw_buf) {
         Serial.println("LVGL disp_draw_buf allocate failed!");
     } else {
-        lv_disp_draw_buf_init(&draw_buf, disp_draw_buf, NULL, screenWidth * screenHeight / 4);
+        lv_disp_draw_buf_init(&draw_buf, disp_draw_buf, NULL, screenWidth * screenHeight / GFX_FRAME_BUFFER_FRACTION);
 
         /* Initialize the display */
         lv_disp_drv_init(&disp_drv);

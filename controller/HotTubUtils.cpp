@@ -128,8 +128,8 @@ u_int8_t SpaControlScheduler::getScheduledValue() {
 
     // How far are we into the day (since midnight), in percentages?
     float currentPercentageOfDay = (float)100 * elapsedSecsToday(timeClient->getEpochTime()) / SECS_PER_DAY;
-    Serial.print("Current percentage of day: ");
-    Serial.println(currentPercentageOfDay);
+//    Serial.print("Current percentage of day: ");
+//    Serial.println(currentPercentageOfDay);
     // which segment are we in currently?
     // how many on+off time units into the day are we?
     // eg we are 2.36 on/off segments into the day

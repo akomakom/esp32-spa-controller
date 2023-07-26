@@ -131,7 +131,7 @@ void sendStatus() {
             ESPNowUtils::outgoingStatusControl.min = control->min;
             ESPNowUtils::outgoingStatusControl.max = control->max;
             ESPNowUtils::outgoingStatusControl.type = control->type;
-            ESPNowUtils::outgoingStatusControl.name = control->name;
+            strcpy(ESPNowUtils::outgoingStatusControl.name, control->name);
             ESPNowUtils::outgoingStatusControl.ort = control->getOverrideScheduleRemainingTime();
             ESPNowUtils::outgoingStatusControl.value = control->getEffectiveValue();
 

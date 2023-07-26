@@ -5,6 +5,9 @@
 #ifndef HOT_TUB_CONTROLLER_HOT_TUB_TYPES_H
 #define HOT_TUB_CONTROLLER_HOT_TUB_TYPES_H
 
+// Used only by client:
+enum PairingStatus {NOT_PAIRED, PAIR_REQUEST, PAIR_REQUESTED, PAIR_PAIRED,};
+
 enum MessageType {PAIRING, COMMAND, CONTROL_STATUS, METRICS_STATUS};
 // Structure to receive data
 // Must match the sender structure
@@ -24,7 +27,7 @@ typedef struct struct_status_control {
     u_int8_t min;
     u_int8_t max;
     const char* type;
-    const char* name;
+    char name[10] = "";
     long ort;
     u_int8_t value;
 } struct_status_control;
