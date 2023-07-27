@@ -120,6 +120,7 @@ void loop(void) {
     ESPNowUtils::loop();
     sendStatus();
     yield();
+    sleep(1);
 }
 
 void sendStatus() {
@@ -152,6 +153,8 @@ void espnowCommandReceived(struct_command *command) {
     Serial.print(" value=");Serial.print(command->value);
     Serial.print(" end=");Serial.print(command->end);
     Serial.println();
+
+    previousStatusSendTime = 0; // update others
     spaStatus.controls[command->control_id]->scheduleOverride(
             now() + command->start,
             now() + command->end,

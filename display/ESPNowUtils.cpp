@@ -67,10 +67,10 @@ void ESPNowUtils::OnDataRecv(const uint8_t * mac_addr, const uint8_t *incomingDa
         case CONTROL_STATUS :      // we received data from server
             memcpy(&inData, incomingData, sizeof(inData));
             Serial.print("ID  = ");
-            Serial.println(inData.board_id);
-            Serial.print("control = ");
-            Serial.println(inData.control_id);
-            Serial.print("value = ");
+            Serial.print(inData.board_id);
+            Serial.print(" control = ");
+            Serial.print(inData.control_id);
+            Serial.print(" value = ");
             Serial.println(inData.value);
             dataCallback(&inData);
             break;
