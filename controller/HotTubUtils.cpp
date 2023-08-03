@@ -137,7 +137,8 @@ u_int8_t SpaControlScheduler::getScheduledValue() {
     float fractionOfOnOffUnit =  onOffUnitCount-(long)onOffUnitCount; //leave fraction only, eg 0.36
 
     // Are we past the on->off divider in this on-then-off time unit?
-    return (fractionOfOnOffUnit > onVsOff) ? normalSettings.normalValueOff : normalSettings.normalValueOn;
+    // note that the = in >= prevents a midnight blip when everything turns on for a second (0=0)
+    return (fractionOfOnOffUnit >= onVsOff) ? normalSettings.normalValueOff : normalSettings.normalValueOn;
 }
 
 bool SpaControlScheduler::isOverrideScheduleEnabled() {

@@ -3,7 +3,7 @@
 
 ARDUINO_CLI ?= /opt/arduino-cli/arduino-cli
 BAUD ?= 115200
-PORT ?= /dev/ttyUSB2
+PORT ?= /dev/ttyUSB1
 FQBN ?= esp32:esp32:esp32s3
 BOARD_OPTIONS ?= PSRAM=opi,FlashSize=16M,DebugLevel=warn
 FQBN_PATH = $(shell echo ${FQBN} | tr : .)
