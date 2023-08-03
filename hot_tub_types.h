@@ -26,10 +26,12 @@ typedef struct struct_status_control {
     u_int8_t control_id;
     u_int8_t min;
     u_int8_t max;
-    const char* type;
+    char type[10] = ""; // control type
     char name[10] = "";
-    long ort;
+    u_int32_t DO;   // Default override time
+    u_int32_t ORT;  // override remaining time
     u_int8_t value;
+    u_int8_t e_value;
 } struct_status_control;
 
 typedef struct struct_pairing {       // new structure for pairing

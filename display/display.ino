@@ -138,10 +138,10 @@ void dataReceivedControlStatus(struct_status_control *status) {
         // update our copy of the data
         memcpy(controlStatuses[status->control_id], status, sizeof(struct_status_control));
         //        controlButtons[status->control_id]
-        showStatusMessage("Updating copy of status, max orig %d new %d", status->max, controlStatuses[status->control_id]->max);
+//        showStatusMessage("Updating copy of status, max orig %d new %d", status->max, controlStatuses[status->control_id]->max);
 
         lv_obj_t * label = lv_obj_get_child(controlButtons[status->control_id], 0);
-        lv_label_set_text_fmt(label, "%s (%s)", status->name, status->value > 0 ? "ON" : "OFF");
+        lv_label_set_text_fmt(label, "%s (%s)", status->name, status->e_value > 0 ? "ON" : "OFF");
     }
 
 }
@@ -176,7 +176,12 @@ static void btn_event_cb(lv_event_t * e)
     if(code == LV_EVENT_CLICKED) {
         struct_status_control * status = (struct_status_control*) lv_event_get_user_data(e);
         showStatusMessage("Ctrl %s (%d), from %d to %d, min %d max %d ", status->name, status->control_id, status->value, status->value > status->min ? status->min : status->max, status->min, status->max);
-        ESPNowUtils::sendOverrideCommand(status->control_id, 0, 30, status->value > status->min ? status->min : status->max);
+        ESPNowUtils::sendOverrideCommand(
+                status->control_id,
+                0, // start now
+                status->ORT > 0 ? 0 : status->DO, // if we're in override, cancel it
+                status->value > status->min ? status->min : status->max // simplistic "just do the opposite"
+        );
 
 
 //        static uint8_t cnt = 0;

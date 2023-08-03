@@ -97,6 +97,7 @@ void setup(void) {
                     (u_int8_t)server.arg("normalValueOn").toInt(),
                     (u_int8_t)server.arg("normalValueOff").toInt()
             );
+            control->normalSettings.overrideDefaultDurationSeconds = (u_int32_t)server.arg("overrideDefaultDurationSeconds").toInt();
             control->persist();
             previousStatusSendTime = 0; // update others
             sendJSONResponse(WEB_RESPONSE_OK);
@@ -120,7 +121,7 @@ void loop(void) {
     ESPNowUtils::loop();
     sendStatus();
     yield();
-    sleep(1);
+//    sleep(5);
 }
 
 void sendStatus() {
@@ -134,10 +135,12 @@ void sendStatus() {
             ESPNowUtils::outgoingStatusControl.control_id = i;
             ESPNowUtils::outgoingStatusControl.min = control->min;
             ESPNowUtils::outgoingStatusControl.max = control->max;
-            ESPNowUtils::outgoingStatusControl.type = control->type;
+            strcpy(ESPNowUtils::outgoingStatusControl.type, control->type);
             strcpy(ESPNowUtils::outgoingStatusControl.name, control->name);
-            ESPNowUtils::outgoingStatusControl.ort = control->getOverrideScheduleRemainingTime();
+            ESPNowUtils::outgoingStatusControl.ORT = control->getOverrideScheduleRemainingTime();
+            ESPNowUtils::outgoingStatusControl.DO = control->normalSettings.overrideDefaultDurationSeconds;
             ESPNowUtils::outgoingStatusControl.value = control->getEffectiveValue();
+            ESPNowUtils::outgoingStatusControl.e_value = control->getEffectiveValueForDependents();
 
             ESPNowUtils::sendStatusControl();
         }

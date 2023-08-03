@@ -104,9 +104,11 @@ public:
 typedef struct {
     // default is always off:
     u_int8_t percentageOfDayOnTime = 0;
-    u_int8_t numberOfTimesToRun = 1; // stay on
+    u_int8_t numberOfTimesToRun = 1; // we don't allow 0 here
     u_int8_t normalValueOn = 1;
     u_int8_t normalValueOff = 0;
+
+    u_int32_t overrideDefaultDurationSeconds = 60 * 20; // 20 minutes default
 } SpaSchedulerNormalSettings;
 
 /**
@@ -179,6 +181,9 @@ public:
 
 
     char configString[150]; // for JSON output
+
+    SpaSchedulerNormalSettings normalSettings;
+
 private:
     /**
      * Utility that will raise an exception for out of bounds
@@ -187,8 +192,6 @@ private:
     void checkBounds(u_int8_t value);
 
     static const u_int8_t SCHEDULER_DISABLED_VALUE = -1;
-
-    SpaSchedulerNormalSettings normalSettings;
 
     time_t overrideStartTime = now();
     time_t overrideEndTime = now();

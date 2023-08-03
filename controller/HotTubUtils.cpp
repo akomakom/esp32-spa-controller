@@ -161,6 +161,7 @@ void SpaControlScheduler::updateConfigJsonString() {
     jsonConfig["numberOfTimesToRun"] = normalSettings.numberOfTimesToRun;
     jsonConfig["normalValueOn"] = normalSettings.normalValueOn;
     jsonConfig["normalValueOff"] = normalSettings.normalValueOff;
+    jsonConfig["overrideDefaultDurationSeconds"] = normalSettings.overrideDefaultDurationSeconds;
     serializeJson(jsonConfig, configString);
 }
 
@@ -173,10 +174,9 @@ SpaControl::SpaControl(const char *name, const char *type) {
 }
 
 void SpaControl::toggle() {
-    // TODO: decide on defaults ore take as input
-    scheduleOverride(now(), now() + 20 * SECS_PER_MIN, getNextValue());
-    Serial.println("PARENT!!! Value after toggle is ");
-    Serial.println(getEffectiveValue());
+    scheduleOverride(now(), now() + normalSettings.overrideDefaultDurationSeconds, getNextValue());
+//    Serial.println("PARENT!!! Value after toggle is ");
+//    Serial.println(getEffectiveValue());
 }
 
 u_int8_t SpaControl::getEffectiveValue() {
@@ -309,6 +309,8 @@ void SpaStatus::updateStatusString() {
         control->jsonStatus["value"] = control->getEffectiveValue();
         control->jsonStatus["min"] = control->min;
         control->jsonStatus["max"] = control->max;
+        // default override time
+        control->jsonStatus["DO"] = control->normalSettings.overrideDefaultDurationSeconds;
         control->jsonStatus["type"] = control->type;
         control->jsonStatus["ORT"] = control->getOverrideScheduleRemainingTime();
         control->jsonStatus["eval"] = control->getEffectiveValueForDependents();
