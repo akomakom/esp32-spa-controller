@@ -8,10 +8,11 @@
 #include <Preferences.h>
 
 // NTP stuff
-#include <NTPClient.h>
-#include <WiFiUdp.h>
+#include "time.h"
+#include "sntp.h"
 
 extern Preferences app_preferences;
-extern NTPClient *timeClient;
+extern struct tm *main_device_time;
+extern int timezone_offset;
 
 #endif //HOT_TUB_CONTROLLER_CORE_H

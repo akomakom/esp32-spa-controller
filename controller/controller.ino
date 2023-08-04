@@ -12,10 +12,104 @@
 // Interval at which to publish sensor readings
 #define ESP_STATUS_SEND_INTERVAL  10000
 
+// TimeZone rule including daylight adjustment rules (optional)
+// TODO: move to Preferences
+const char* time_zone = "EST5EDT,M3.2.0,M11.1.0";
+const char* ntpServer1 = "pool.ntp.org";
+const char* ntpServer2 = "time.nist.gov";
 
 SpaStatus spaStatus;
 // Stores last time status was published on esp-now
 unsigned long previousStatusSendTime = 0;
+
+void setDeviceTime(){
+    static unsigned long lastPrint;
+    bool debug = ((lastPrint + 10000) < millis());
+    if (debug) {
+        lastPrint = millis();
+    }
+
+    if(!getLocalTime(main_device_time, 9)){
+        if ((lastPrint + 10000) < millis()) {
+            Serial.println("No time available (yet)");
+            lastPrint = millis();
+        }
+        return;
+    }
+    if (debug) {
+        Serial.println(main_device_time, "Determined time: %A, %B %d %Y %H:%M:%S");
+    }
+//    static time_t t = mktime(main_device_time);
+//    struct timeval now = { .tv_sec = t };
+    // this seems to be causing time to stand still:
+//    settimeofday(&now, NULL); // is this even useful?
+
+    // calculate timezone offset
+
+    static struct tm  linfo, ginfo;
+    static time_t  rawt;
+    time( &rawt );
+    gmtime_r( &rawt, &ginfo);
+    localtime_r( &rawt, &linfo);
+
+    time_t g = mktime(&ginfo);
+    time_t l = mktime(&linfo);
+
+    static int    offsetSeconds = difftime( l, g );
+    static int    offsetHours   = (int)offsetSeconds /(60*60);
+    // for our globals, we care about actual time offset (including DST)
+    timezone_offset = linfo.tm_isdst ? offsetSeconds + 3600 : offsetSeconds;
+    // print out debugs every minute
+    if ((lastPrint + 60000) < millis()) {
+//        Serial.printf("Setting time to %s\n", asctime(main_device_time));
+        Serial.printf("Timezone offset is %d hour%s (%d seconds), %s  current offset is %d hour%s (%d seconds)\n\n",
+                      offsetHours,
+                      (offsetHours > 1 || offsetHours < -1) ? "s" : "",
+                      offsetSeconds,
+                      linfo.tm_isdst ? "DST in effect" : "DST not in effect",
+                      linfo.tm_isdst ? offsetHours + 1 : offsetHours,
+                      ((offsetHours + 1) > 1 || (offsetHours + 1) < -1) ? "s" : "",
+                      timezone_offset
+                      );
+
+//        Serial.printf("Device time: %d\n", rawt);
+        lastPrint = millis();
+    }
+}
+
+// Callback function (get's called when time adjusts via NTP)
+void timeavailable(struct timeval *t)
+{
+    Serial.println("Got time adjustment from NTP!");
+    setDeviceTime();
+}
+
+void setupNTP() {
+    sntp_set_time_sync_notification_cb( timeavailable );
+    /**
+     * NTP server address could be aquired via DHCP,
+     *
+     * NOTE: This call should be made BEFORE esp32 aquires IP address via DHCP,
+     * otherwise SNTP option 42 would be rejected by default.
+     * NOTE: configTime() function call if made AFTER DHCP-client run
+     * will OVERRIDE aquired NTP server address
+     */
+//    sntp_servermode_dhcp(1);    // (optional)
+
+    /**
+     * This will set configured ntp servers and constant TimeZone/daylightOffset
+     * should be OK if your time zone does not need to adjust daylightOffset twice a year,
+     * in such a case time adjustment won't be handled automagicaly.
+     */
+//    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
+
+    /**
+     * A more convenient approach to handle TimeZones with daylightOffset
+     * would be to specify a environmnet variable with TimeZone definition including daylight adjustmnet rules.
+     * A list of rules for your zone could be obtained from https://github.com/esp8266/Arduino/blob/master/cores/esp8266/TZ.h
+     */
+    configTzTime(time_zone, ntpServer1, ntpServer2);
+}
 
 void setup(void) {
     Serial.begin(115200);
@@ -24,8 +118,7 @@ void setup(void) {
         Serial.println("Unable to open preferences");
     }
 
-    // TODO: is timelib and ntpclient completely independent?
-    // setenv("TZ","EST5EDT,M3.2.0,M11.1.0",1);
+    setupNTP();
 
     // To support ESP-NOW
     // Set the device as a Station and Soft Access Point simultaneously
@@ -113,6 +206,7 @@ void setup(void) {
 }
 
 void loop(void) {
+    setDeviceTime();
     server.handleClient();
     spaStatus.loop();
     ESPNowUtils::loop();
@@ -127,7 +221,8 @@ void sendStatus() {
         // Save the last time a new reading was published
         previousStatusSendTime = currentMillis;
 
-        ESPNowUtils::outgoingStatusServer.time = timeClient->getEpochTime();
+        ESPNowUtils::outgoingStatusServer.time = mktime(main_device_time);
+        ESPNowUtils::outgoingStatusServer.tz_offset = timezone_offset;
         // TODO:
 //        ESPNowUtils::outgoingStatusServer.server_name =
 

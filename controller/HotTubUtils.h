@@ -10,8 +10,6 @@
 #include "pgmspace.h"
 #include <stdexcept>
 #include <ArduinoJson.h>
-#include <TimeLib.h>
-#include <TimeAlarms.h>
 
 
 #include "core.h"

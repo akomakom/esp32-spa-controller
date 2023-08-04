@@ -66,6 +66,7 @@ void ESPNowUtils::OnDataRecv(const uint8_t * mac_addr, const uint8_t *incomingDa
     Serial.print("data size = ");
     Serial.println(sizeof(incomingData));
     uint8_t type = incomingData[0];
+    lastMessageReceivedTime = millis();
     switch (type) {
         case CONTROL_STATUS :      // we received data from server
             memcpy(&receivedControlStatus, incomingData, sizeof(receivedControlStatus));
@@ -196,6 +197,9 @@ void ESPNowUtils::setup() {
 
 void ESPNowUtils::loop() {
     if (autoPairing() == PAIR_PAIRED) {
+        if (lastMessageReceivedTime + MESSAGE_RECEIVED_MAX_AGE < millis()) {
+            pairingStatus = PAIR_REQUEST; // re-start pairing if server restarts
+        }
 //    Serial.println(channel);
 //        unsigned long currentMillis = millis();
         if (currentMillis - previousMillis >= 10000) {

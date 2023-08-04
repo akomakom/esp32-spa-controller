@@ -24,7 +24,7 @@ typedef struct struct_status_server {
     uint8_t msgType = SERVER_STATUS;
     uint8_t board_id;
     time_t time;
-    u_int8_t tz_offset = 0;
+    int tz_offset = 0;
     char server_name[20] = "Hot Tub";
 } struct_status_server;
 

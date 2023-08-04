@@ -17,8 +17,10 @@
 
 // Set your Board and Server ID
 #define BOARD_ID 1
-#define MAX_CHANNEL 11  // for North America // 13 in Europe
-
+// for North America // 13 in Europe
+#define MAX_CHANNEL 11
+// millis, if no message in that time, re-pair
+#define MESSAGE_RECEIVED_MAX_AGE 60000
 
 class ESPNowUtils {
 public:
@@ -39,6 +41,7 @@ public:
 private:
 
     inline static int channel = 1;
+    inline static unsigned long lastMessageReceivedTime = 0;
     inline static uint8_t serverAddress[] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
     inline static unsigned long previousMillis = 0;   // for pairing
     inline static unsigned long currentMillis = 0;

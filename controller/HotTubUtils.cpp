@@ -3,9 +3,6 @@
 
 
 
-extern Preferences app_preferences = Preferences();
-WiFiUDP ntpUDP;
-extern NTPClient *timeClient = new NTPClient(ntpUDP, "pool.ntp.org", 0, 3600000);
 
 /*** SpaControlDependencies ***/
 
@@ -127,7 +124,8 @@ u_int8_t SpaControlScheduler::getScheduledValue() {
     // length of each unit as a percentage of day length
 
     // How far are we into the day (since midnight), in percentages?
-    float currentPercentageOfDay = (float)100 * elapsedSecsToday(timeClient->getEpochTime()) / SECS_PER_DAY;
+    long elapsedSecsToday = main_device_time->tm_hour * 3600 + main_device_time->tm_min * 60 + main_device_time->tm_sec;
+    float currentPercentageOfDay = (float)100 * elapsedSecsToday / 86400; // seconds per day
 //    Serial.print("Current percentage of day: ");
 //    Serial.println(currentPercentageOfDay);
     // which segment are we in currently?
@@ -321,7 +319,7 @@ void SpaStatus::updateStatusString() {
     }
 
     jsonStatusMetrics["temp"] = temperatureUtils.getTempF(0);
-    jsonStatusMetrics["time"] = timeClient->getEpochTime();
+    jsonStatusMetrics["time"] = mktime(main_device_time);
     jsonStatusMetrics["uptime"] = esp_timer_get_time() / 1000000;
     serializeJson(jsonStatus, statusString);
 }
@@ -341,7 +339,6 @@ SpaControl *SpaStatus::findByName(const char *name) {
 }
 
 void SpaStatus::setup() {
-    timeClient->begin();
 
     // Defaults:
     pump->normalSchedule(50, 2, 1, 0); // TODO: Save preferences and build a UI to modify
@@ -360,7 +357,6 @@ void SpaStatus::setup() {
 }
 
 void SpaStatus::loop() {
-    timeClient->update();
     for (SpaControl *control: controls) {
         control->applyOutputs();
     }

@@ -171,7 +171,7 @@ void loop()
 void dataReceivedServerStatus(struct_status_server *status) {
 //    showStatusMessage("Status: %s value %d min %d max %d.  Up %d", status->name, status->value, status->min, status->max, now());
     // set time from server
-    setTime(status->time);
+    setTime(status->time + status->tz_offset);
     Serial.println("Set Time");
 
     if (bannerLabel != NULL) { // already initialized
