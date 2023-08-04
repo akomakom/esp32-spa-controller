@@ -24,7 +24,9 @@ public:
     static void registerDataCallBackHandler(hot_tub_command_recv_callback callbackFunc);
     // relies on someone updating outgoingStatusControl first
     static void sendStatusControl();
+    static void sendStatusServer();
 
+    inline static struct_status_server  outgoingStatusServer;
     inline static struct_status_control outgoingStatusControl;
 private:
     inline static esp_now_peer_info_t slave;

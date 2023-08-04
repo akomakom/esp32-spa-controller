@@ -8,7 +8,7 @@
 // Used only by client:
 enum PairingStatus {NOT_PAIRED, PAIR_REQUEST, PAIR_REQUESTED, PAIR_PAIRED,};
 
-enum MessageType {PAIRING, COMMAND, CONTROL_STATUS, METRICS_STATUS};
+enum MessageType {PAIRING, COMMAND, CONTROL_STATUS, SERVER_STATUS, METRICS_STATUS};
 // Structure to receive data
 // Must match the sender structure
 typedef struct struct_command {
@@ -20,8 +20,16 @@ typedef struct struct_command {
     u_int8_t value;
 } struct_command;
 
+typedef struct struct_status_server {
+    uint8_t msgType = SERVER_STATUS;
+    uint8_t board_id;
+    time_t time;
+    u_int8_t tz_offset = 0;
+    char server_name[20] = "Hot Tub";
+} struct_status_server;
+
 typedef struct struct_status_control {
-    uint8_t msgType;
+    uint8_t msgType = CONTROL_STATUS;
     uint8_t board_id;
     u_int8_t control_id;
     u_int8_t min;

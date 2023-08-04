@@ -41,8 +41,11 @@ void ESPNowUtils::sendOverrideCommand(u_int8_t control_id, time_t start, time_t 
     esp_err_t result = esp_now_send(serverAddress, (uint8_t *) &outgoingCommand, sizeof(outgoingCommand));
 }
 
-void ESPNowUtils::registerDataCallBackHandler(hot_tub_control_status_recv_callback callbackFunc) {
-    dataCallback = callbackFunc;
+void ESPNowUtils::registerDataCallbackControlHandler(hot_tub_control_status_recv_callback callbackFunc) {
+    dataCallbackControl = callbackFunc;
+}
+void ESPNowUtils::registerDataCallbackServerHandler(hot_tub_server_status_recv_callback callbackFunc) {
+    dataCallbackServer = callbackFunc;
 }
 
 void ESPNowUtils::registerEspCommStatusCallBackHandler(ESPNowUtils::esp_comm_status_callback callbackFunc) {
@@ -65,16 +68,21 @@ void ESPNowUtils::OnDataRecv(const uint8_t * mac_addr, const uint8_t *incomingDa
     uint8_t type = incomingData[0];
     switch (type) {
         case CONTROL_STATUS :      // we received data from server
-            memcpy(&inData, incomingData, sizeof(inData));
+            memcpy(&receivedControlStatus, incomingData, sizeof(receivedControlStatus));
             Serial.print("ID  = ");
-            Serial.print(inData.board_id);
+            Serial.print(receivedControlStatus.board_id);
             Serial.print(" control = ");
-            Serial.print(inData.control_id);
+            Serial.print(receivedControlStatus.control_id);
             Serial.print(" value = ");
-            Serial.println(inData.value);
-            dataCallback(&inData);
+            Serial.println(receivedControlStatus.value);
+            dataCallbackControl(&receivedControlStatus);
             break;
-
+        case SERVER_STATUS:
+            memcpy(&receivedServerStatus, incomingData, sizeof(receivedServerStatus));
+            Serial.print("Received server status from ");
+            Serial.println(receivedServerStatus.server_name);
+            dataCallbackServer(&receivedServerStatus);
+            break;
         case PAIRING:    // we received pairing data from server
             memcpy(&pairingData, incomingData, sizeof(pairingData));
             if (pairingData.board_id == 0) {              // the message comes from server
@@ -89,8 +97,8 @@ void ESPNowUtils::OnDataRecv(const uint8_t * mac_addr, const uint8_t *incomingDa
                 addPeer(pairingData.macAddr, pairingData.channel); // add the server  to the peer list
 #ifdef SAVE_CHANNEL
                 lastChannel = pairingData.channel;
-        EEPROM.write(0, pairingData.channel);
-        EEPROM.commit();
+                EEPROM.write(0, pairingData.channel);
+                EEPROM.commit();
 #endif
                 pairingStatus = PAIR_PAIRED;             // set the pairing status
             }

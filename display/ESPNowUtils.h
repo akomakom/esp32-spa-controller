@@ -24,11 +24,13 @@ class ESPNowUtils {
 public:
 
     typedef void (*hot_tub_control_status_recv_callback)(struct_status_control *status);
+    typedef void (*hot_tub_server_status_recv_callback)(struct_status_server *status);
     typedef void (*esp_comm_status_callback)(const char *messageFormat, ...);
 
     static void setup();
     static void loop();
-    static void registerDataCallBackHandler(hot_tub_control_status_recv_callback callbackFunc);
+    static void registerDataCallbackControlHandler(hot_tub_control_status_recv_callback callbackFunc);
+    static void registerDataCallbackServerHandler(hot_tub_server_status_recv_callback callbackFunc);
     static void registerEspCommStatusCallBackHandler(esp_comm_status_callback callbackFunc);
     // relies on someone updating outgoingStatusControl first
     static void sendOverrideCommand(u_int8_t control_id, time_t start, time_t end, u_int8_t value);
@@ -42,11 +44,13 @@ private:
     inline static unsigned long currentMillis = 0;
     inline static unsigned long pairingStartTime = 0; // used to measure Pairing time
 
-    inline static hot_tub_control_status_recv_callback dataCallback;
+    inline static hot_tub_control_status_recv_callback dataCallbackControl;
+    inline static hot_tub_server_status_recv_callback dataCallbackServer;
     inline static esp_comm_status_callback espCommCallback;
 
     inline static struct_command myData;  // data to send
-    inline static struct_status_control inData;  // data received
+    inline static struct_status_control receivedControlStatus;  // data received
+    inline static struct_status_server receivedServerStatus;  // data received
     inline static struct_pairing pairingData;
     inline static PairingStatus pairingStatus;
 //    inline static int chan;

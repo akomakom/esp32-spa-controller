@@ -114,6 +114,9 @@ void ESPNowUtils::registerDataCallBackHandler(hot_tub_command_recv_callback call
 void ESPNowUtils::sendStatusControl() {
     esp_now_send(NULL, (uint8_t *) &outgoingStatusControl, sizeof(outgoingStatusControl));
 }
+void ESPNowUtils::sendStatusServer() {
+    esp_now_send(NULL, (uint8_t *) &outgoingStatusServer, sizeof(outgoingStatusServer));
+}
 
 void ESPNowUtils::initESP_NOW() {
     // Init ESP-NOW
@@ -137,8 +140,8 @@ void ESPNowUtils::setup() {
 
     initESP_NOW();
 
-    outgoingStatusControl.msgType = CONTROL_STATUS;
     outgoingStatusControl.board_id = 0;
+    outgoingStatusServer.board_id = 0;
 }
 
 void ESPNowUtils::loop() {

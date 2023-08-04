@@ -9,10 +9,13 @@
 #include "HotTubUtils.h"
 #include "ESPNowUtils.h"
 
+// Interval at which to publish sensor readings
+#define ESP_STATUS_SEND_INTERVAL  10000
+
+
 SpaStatus spaStatus;
 // Stores last time status was published on esp-now
 unsigned long previousStatusSendTime = 0;
-const long statusSendinterval = 10000;        // Interval at which to publish sensor readings
 
 void setup(void) {
     Serial.begin(115200);
@@ -20,7 +23,9 @@ void setup(void) {
     if (!app_preferences.begin("hot-tub")) {
         Serial.println("Unable to open preferences");
     }
-    // while(!Serial);
+
+    // TODO: is timelib and ntpclient completely independent?
+    // setenv("TZ","EST5EDT,M3.2.0,M11.1.0",1);
 
     // To support ESP-NOW
     // Set the device as a Station and Soft Access Point simultaneously
@@ -29,19 +34,11 @@ void setup(void) {
     WiFi.begin(WIFI_NAME, WIFI_PASS);
     Serial.println("");
 
-    Serial.print("Connnecting to WiFi SSID: ");
-    Serial.println(WIFI_NAME);
-    // Wait for connection
-    // TODO: probably a bad idea
-//    while (WiFi.status() != WL_CONNECTED) {
-//        delay(500);
-//        Serial.print(".");
-//    }
-    Serial.println("");
     Serial.print("Connected to ");
-    Serial.println(WIFI_NAME);
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
+    Serial.print(WIFI_NAME);
+    Serial.print(" IP address: ");
+    Serial.print(WiFi.localIP());
+    Serial.println("");
 
 //    /*use mdns for host name resolution*/
 //    if (!MDNS.begin(WIFI_HOST)) { //http://esp32.local
@@ -126,9 +123,15 @@ void loop(void) {
 
 void sendStatus() {
     unsigned long currentMillis = millis();
-    if (currentMillis - previousStatusSendTime >= statusSendinterval) {
+    if (currentMillis - previousStatusSendTime >= ESP_STATUS_SEND_INTERVAL) {
         // Save the last time a new reading was published
         previousStatusSendTime = currentMillis;
+
+        ESPNowUtils::outgoingStatusServer.time = timeClient->getEpochTime();
+        // TODO:
+//        ESPNowUtils::outgoingStatusServer.server_name =
+
+        ESPNowUtils::sendStatusServer();
 
         for (int i = 0 ; i < spaStatus.controls.size() ; i++) {
             SpaControl* control = spaStatus.controls[i];
