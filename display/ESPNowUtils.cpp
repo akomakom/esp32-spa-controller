@@ -143,9 +143,9 @@ PairingStatus ESPNowUtils::autoPairing(){
             if(currentMillis - previousMillis > 250) {
                 previousMillis = currentMillis;
                 // time out expired,  try next channel
-                channel ++;
-                if (channel > MAX_CHANNEL){
-                    channel = 1;
+                channel --;
+                if (channel < 0){
+                    channel = MAX_CHANNEL;
                 }
                 pairingStatus = PAIR_REQUEST;
             }

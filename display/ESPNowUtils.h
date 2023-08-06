@@ -40,7 +40,7 @@ public:
     inline static struct_command outgoingCommand;
 private:
 
-    inline static int channel = 1;
+    inline static int channel = MAX_CHANNEL; // start from last, CH 11 is most common
     inline static unsigned long lastMessageReceivedTime = 0;
     inline static uint8_t serverAddress[] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
     inline static unsigned long previousMillis = 0;   // for pairing

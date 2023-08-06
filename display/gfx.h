@@ -76,6 +76,8 @@ static uint32_t screenHeight;
 static lv_disp_draw_buf_t draw_buf;
 static lv_color_t *disp_draw_buf;
 static lv_disp_drv_t disp_drv;
+static unsigned long last_gfx_touch_time = 0;
+#define BL_TIMEOUT 60000
 
 /* Display flushing */
 void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p)
@@ -92,12 +94,18 @@ void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color
     lv_disp_flush_ready(disp);
 }
 
+void gfx_backlight(bool on) {
+    digitalWrite(TFT_BL, on ? HIGH : LOW);
+}
+
 void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 {
     if (touch_has_signal())
     {
         if (touch_touched())
         {
+            last_gfx_touch_time = millis();
+
             data->state = LV_INDEV_STATE_PR;
 
             /*Set the coordinates*/
@@ -118,6 +126,10 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
     {
         data->state = LV_INDEV_STATE_REL;
     }
+}
+
+void gfx_loop() {
+    gfx_backlight((last_gfx_touch_time + BL_TIMEOUT) > millis());
 }
 
 void gfx_init() {

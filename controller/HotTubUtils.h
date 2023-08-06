@@ -289,12 +289,12 @@ private:
     StaticJsonDocument<STATUS_LENGTH> jsonStatus;
     JsonArray jsonStatusControls = jsonStatus.createNestedArray("controls");
     JsonObject jsonStatusMetrics = jsonStatus.createNestedObject("metrics");
-    TemperatureUtils temperatureUtils;
 
 
 public:
     SpaStatus();
 
+    TemperatureUtils temperatureUtils;
     SpaControl* pump = new TwoSpeedSpaControl("pump", RELAY_PIN_1, RELAY_PIN_2);
     SpaControl* blower = new SimpleSpaControl("blower", RELAY_PIN_3);
     SpaControl* heater = new SensorBasedControl("heater", RELAY_PIN_4, 0, 1, &temperatureUtils);

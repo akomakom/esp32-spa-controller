@@ -201,7 +201,8 @@ void setup(void) {
 
     spaStatus.setup();
     ESPNowUtils::setup();
-    ESPNowUtils::registerDataCallBackHandler((ESPNowUtils::hot_tub_command_recv_callback)espnowCommandReceived);
+    ESPNowUtils::registerCommandCallBackHandler((ESPNowUtils::hot_tub_command_recv_callback)espnowCommandReceived);
+    ESPNowUtils::registerPairingCallBackHandler((ESPNowUtils::hot_tub_paired_callback)peerAdded);
 
 }
 
@@ -215,6 +216,10 @@ void loop(void) {
 //    sleep(5);
 }
 
+void peerAdded(struct_pairing pairing) {
+    previousStatusSendTime = 0; // update others
+}
+
 void sendStatus() {
     unsigned long currentMillis = millis();
     if (currentMillis - previousStatusSendTime >= ESP_STATUS_SEND_INTERVAL) {
@@ -223,6 +228,8 @@ void sendStatus() {
 
         ESPNowUtils::outgoingStatusServer.time = mktime(main_device_time);
         ESPNowUtils::outgoingStatusServer.tz_offset = timezone_offset;
+        ESPNowUtils::outgoingStatusServer.water_temp = spaStatus.temperatureUtils.getTempF(0);;
+
         // TODO:
 //        ESPNowUtils::outgoingStatusServer.server_name =
 

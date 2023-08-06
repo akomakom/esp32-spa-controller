@@ -73,7 +73,9 @@ void ESPNowUtils::OnDataRecv(const uint8_t * mac_addr, const uint8_t *incomingDa
     switch (type) {
         case COMMAND :                           // the message is data type
             memcpy(&incomingCommand, incomingData, sizeof(incomingCommand));
-            callback(&incomingCommand);
+            if (commandCallback != NULL) {
+                commandCallback(&incomingCommand);
+            }
 //            // create a JSON document with received data and send it by event to the web page
 //            root["id"] = incomingReadings.board_id;
 //            root["temperature"] = incomingReadings.temp;
@@ -100,15 +102,22 @@ void ESPNowUtils::OnDataRecv(const uint8_t * mac_addr, const uint8_t *incomingDa
                     pairingData.channel = chan;
                     Serial.println("send response");
                     esp_err_t result = esp_now_send(mac_addr, (uint8_t *) &pairingData, sizeof(pairingData));
-                    addPeer(mac_addr);
+                    if (addPeer(mac_addr)) {
+                        if (pairedCallback != NULL) {
+                            pairedCallback(&pairingData);
+                        }
+                    }
                 }
             }
             break;
     }
 }
 
-void ESPNowUtils::registerDataCallBackHandler(hot_tub_command_recv_callback callbackFunc) {
-    callback = callbackFunc;
+void ESPNowUtils::registerCommandCallBackHandler(hot_tub_command_recv_callback callbackFunc) {
+    commandCallback = callbackFunc;
+}
+void ESPNowUtils::registerPairingCallBackHandler(ESPNowUtils::hot_tub_paired_callback callbackFunc) {
+    pairedCallback = callbackFunc;
 }
 
 void ESPNowUtils::sendStatusControl() {

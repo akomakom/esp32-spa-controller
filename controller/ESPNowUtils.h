@@ -17,10 +17,12 @@ class ESPNowUtils {
 public:
 
     typedef void (*hot_tub_command_recv_callback)(struct_command *command);
+    typedef void (*hot_tub_paired_callback)(struct_pairing *pairing);
 
     static void setup();
     static void loop();
-    static void registerDataCallBackHandler(hot_tub_command_recv_callback callbackFunc);
+    static void registerCommandCallBackHandler(hot_tub_command_recv_callback callbackFunc);
+    static void registerPairingCallBackHandler(hot_tub_paired_callback callbackFunc);
     // relies on someone updating outgoingStatusControl first
     static void sendStatusControl();
     static void sendStatusServer();
@@ -38,7 +40,8 @@ private:
 
     inline static struct_command incomingCommand;
     inline static struct_pairing pairingData;
-    inline static hot_tub_command_recv_callback callback;
+    inline static hot_tub_command_recv_callback commandCallback = NULL;
+    inline static hot_tub_paired_callback pairedCallback = NULL;
 
 
     static void readDataToSend();

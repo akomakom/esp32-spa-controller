@@ -1,5 +1,7 @@
 /secrets.h
 *.bin
+*.map
+*.elf
 /controller/hot_tub_types.h
 /controller/secrets.h
 /display/hot_tub_types.h

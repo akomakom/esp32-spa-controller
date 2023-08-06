@@ -8,6 +8,9 @@
 // Used only by client:
 enum PairingStatus {NOT_PAIRED, PAIR_REQUEST, PAIR_REQUESTED, PAIR_PAIRED,};
 
+//TODO: affects json and esp-now
+//enum ControlType {OFF_ON, OFF_LOW_HIGH, SENSOR_BASED};
+
 enum MessageType {PAIRING, COMMAND, CONTROL_STATUS, SERVER_STATUS, METRICS_STATUS};
 // Structure to receive data
 // Must match the sender structure
@@ -24,6 +27,7 @@ typedef struct struct_status_server {
     uint8_t msgType = SERVER_STATUS;
     uint8_t board_id;
     time_t time;
+    float water_temp;
     int tz_offset = 0;
     char server_name[20] = "Hot Tub";
 } struct_status_server;
@@ -34,8 +38,8 @@ typedef struct struct_status_control {
     u_int8_t control_id;
     u_int8_t min;
     u_int8_t max;
-    char type[10] = ""; // control type
-    char name[10] = "";
+    char type[15] = ""; // control type
+    char name[15] = "";
     u_int32_t DO;   // Default override time
     u_int32_t ORT;  // override remaining time
     u_int8_t value;
