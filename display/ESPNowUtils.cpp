@@ -55,7 +55,11 @@ void ESPNowUtils::registerEspCommStatusCallBackHandler(ESPNowUtils::esp_comm_sta
 // callback when data is sent
 void ESPNowUtils::OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
     Serial.print("\r\nLast Packet Send Status:\t");
+    lastMessageSentTime = millis();
     Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+    if (status != ESP_NOW_SEND_SUCCESS) {
+        espCommCallback("Command Delivery Failed");
+    }
 }
 
 
@@ -112,6 +116,7 @@ PairingStatus ESPNowUtils::autoPairing(){
     switch(pairingStatus) {
         case PAIR_REQUEST:
             Serial.print("Pairing request on channel "  );
+            espCommCallback("Pairing request on ch %d", channel);
             Serial.println(channel);
 
             // set WiFi channel
@@ -144,7 +149,7 @@ PairingStatus ESPNowUtils::autoPairing(){
                 previousMillis = currentMillis;
                 // time out expired,  try next channel
                 channel --;
-                if (channel < 0){
+                if (channel < 1){
                     channel = MAX_CHANNEL;
                 }
                 pairingStatus = PAIR_REQUEST;

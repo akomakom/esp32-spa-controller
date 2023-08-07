@@ -38,10 +38,12 @@ public:
     static void sendOverrideCommand(u_int8_t control_id, time_t start, time_t end, u_int8_t value);
 
     inline static struct_command outgoingCommand;
+
+    inline static unsigned long lastMessageSentTime = 0;
+    inline static unsigned long lastMessageReceivedTime = 0;
 private:
 
     inline static int channel = MAX_CHANNEL; // start from last, CH 11 is most common
-    inline static unsigned long lastMessageReceivedTime = 0;
     inline static uint8_t serverAddress[] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
     inline static unsigned long previousMillis = 0;   // for pairing
     inline static unsigned long currentMillis = 0;
