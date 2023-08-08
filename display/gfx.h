@@ -111,11 +111,7 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
             /*Set the coordinates*/
             data->point.x = touch_last_x;
             data->point.y = touch_last_y;
-            Serial.print("Touch detected at ");
-            Serial.print(", x = ");
-            Serial.print(data->point.x);
-            Serial.print(", y = ");
-            Serial.print(data->point.y);
+            Serial.printf("Touch at (%d,%d) \n", data->point.x, data->point.y);
         }
         else if (touch_released())
         {
@@ -171,7 +167,11 @@ void gfx_init() {
         lv_indev_drv_init(&indev_drv);
         indev_drv.type = LV_INDEV_TYPE_POINTER;
         indev_drv.read_cb = my_touchpad_read;
-        lv_indev_drv_register(&indev_drv);
+        lv_indev_t *indev    = lv_indev_drv_register(&indev_drv);
+        // debug pointer calibration:
+        lv_obj_t *cursor_img = lv_img_create(lv_scr_act());
+        lv_img_set_src(cursor_img, LV_SYMBOL_OK);
+        lv_indev_set_cursor(indev, cursor_img);
 
     }
 }

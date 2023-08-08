@@ -36,10 +36,16 @@
  #define TOUCH_XPT2046_CS 38
  #define TOUCH_XPT2046_INT 18
  #define TOUCH_XPT2046_ROTATION 0
- #define TOUCH_MAP_X1 4000
- #define TOUCH_MAP_X2 100
- #define TOUCH_MAP_Y1 100
- #define TOUCH_MAP_Y2 4000
+// 100-4000 => 11 - 407 (original)
+// 0-4100 => 33-363
+// 0-4500 => 63-400  (sharp pointer)
+// 500-4500 => 81-455
+// 500-5000 => 116 - 460
+// 0 - 5000 => 105 - 410
+ #define TOUCH_MAP_X1 3950
+ #define TOUCH_MAP_X2 700
+ #define TOUCH_MAP_Y1 700
+ #define TOUCH_MAP_Y2 3950
 
 int touch_last_x = 0, touch_last_y = 0;
 
@@ -174,6 +180,7 @@ bool touch_touched()
   if (ts.touched())
   {
     TS_Point p = ts.getPoint();
+    Serial.printf("Touch Raw remap from %d/%d", p.x, p.y);
 #if defined(TOUCH_SWAP_XY)
     touch_last_x = map(p.y, TOUCH_MAP_X1, TOUCH_MAP_X2, 0, gfx->width() - 1);
     touch_last_y = map(p.x, TOUCH_MAP_Y1, TOUCH_MAP_Y2, 0, gfx->height() - 1);
