@@ -35,18 +35,18 @@ LVGL needs to be configured at the system level as follows
 2. Edit as follows:
 3. Change "if 0" at the top to "if 1"
 4. You may need to experiment with `LV_MEM_CUSTOM`.  The following settings work for `LV_MEM_CUSTOM 0` if you need it.
-   ```
+   ```c++
    #define LV_MEM_SIZE (96U * 1024U)
    #define LV_MEM_POOL_INCLUDE <esp32-hal-psram.h>
    #define LV_MEM_POOL_ALLOC ps_malloc
    ```
 5. Turn these on:
-    ```
-   LV_TICK_CUSTOM 1   (no idea why)
-   LV_COLOR_16_SWAP 1 (possibly only useful for Squareline)
-   LV_SPRINTF_USE_FLOAT 1  (for temperature display)
-   LV_FONT_MONTSERRAT_20 1 (for larger fonts)
-   LV_FONT_MONTSERRAT_40 1 (even larger fonts)
+    ```c++
+   #define LV_TICK_CUSTOM 1   (no idea why)
+   #define LV_COLOR_16_SWAP 1 (possibly only useful for Squareline)
+   #define LV_SPRINTF_USE_FLOAT 1  (for temperature display)
+   #define LV_FONT_MONTSERRAT_20 1 (for larger fonts)
+   #define LV_FONT_MONTSERRAT_40 1 (even larger fonts)
    ```
 
 #### Building
