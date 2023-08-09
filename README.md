@@ -1,5 +1,5 @@
 ESP32 Custom Spa Controller
-----
+---- 
 
 Control a custom hot tub using a bunch of relays and sensors.  
 
@@ -42,9 +42,9 @@ In `controller/` subdirectory:
   * Arduino IDE: Use [this plugin](https://randomnerdtutorials.com/install-esp32-filesystem-uploader-arduino-ide/)
   * Command Line: try `make upload-spiffs-via-http`
 
-See [Makefile](controller%2FMakefile) in that directory
+See [README.md](controller%2FREADME.md) in that directory
 
 #### Display
 
 Instructions are similar to Controller
-See [Makefile](display%2FMakefile) in that directory
+See [README.md](display%2FREADME.md) in that directory
