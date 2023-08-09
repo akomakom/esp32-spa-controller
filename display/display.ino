@@ -216,7 +216,7 @@ void createSensorBasedDialog() {
     TRACE("mbox 1.3");
 //    lv_obj_set_size(sensorBasedControlPanel, lv_pct(90), lv_pct(90));
     lv_obj_add_style(sensorBasedControlPanel, &style, 0);
-    lv_obj_add_style(sensorBasedControlPanel, &stylePadding, 0);
+    lv_obj_add_style(sensorBasedControlPanel, &styleNoPadding, 0);
     lv_obj_center(sensorBasedControlPanel);
     TRACE("mbox 1.4");
     lv_obj_set_style_grid_column_dsc_array(sensorBasedControlPanel, col_dsc, 0);

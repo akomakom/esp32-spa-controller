@@ -12,10 +12,11 @@ This is work-in-progress.
   * blower
   * heater
   * lights
+  * (TBD) Valve actuators with smart power-off
 * Reading temperature sensor data and tying it to controls (eg heater)
 * Sheduling on/off behavior
 * Overriding said schedule briefly (eg pump to high for 20 minutes)
-* Overriding said schedule in the future (eg heater up 10 degrees for the weekend)
+* (TBD) Overriding said schedule in the future (eg heater up 10 degrees for the weekend)
 * Web UI 
 * Touchscreen UI using wireless display/ESP32 boards via ESP-NOW protocol
 * OTA updates
@@ -41,6 +42,9 @@ In `controller/` subdirectory:
   * Arduino IDE: Use [this plugin](https://randomnerdtutorials.com/install-esp32-filesystem-uploader-arduino-ide/)
   * Command Line: try `make upload-spiffs-via-http`
 
+See [Makefile](controller%2FMakefile) in that directory
+
 #### Display
 
 Instructions are similar to Controller
+See [Makefile](display%2FMakefile) in that directory

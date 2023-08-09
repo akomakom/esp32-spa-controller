@@ -261,7 +261,7 @@ SensorBasedControl::SensorBasedControl(const char *name, u_int8_t pin, u_int8_t 
     this->pin = pin;
     this->sensorIndex = sensorIndex;
     this->min = 60; // using Fahrenheit because there is better resolution with integers
-    this->max = 105;
+    this->max = 104;
     this->swing = swing;
     this->temperatureUtils = temps;
 
@@ -281,8 +281,13 @@ u_int8_t SensorBasedControl::getEffectiveValueForDependents() {
 
     // Delta to where we want to be, positive is too hot, negative is too cold:
     float delta = temperatureUtils->getTempF(this->sensorIndex) - (float)getEffectiveValue();
-    // Are we outside of the swing deadband (setpoint-swing to setpoint+swing)?
-    if (std::abs(delta) > swing) {
+    if (getEffectiveValue() == max && delta >= 0) {
+        // We must never exceed max, this is a safety feature.
+        // An appliance may not be capable of going any higher and will be stuck ON forever
+        // Do not apply deadband logic in this case.
+        slowFlipState = false;
+    } else if (std::abs(delta) > swing) {
+        // Are we outside of the swing deadband (setpoint-swing to setpoint+swing)?
         // too hot or too cold and outside deadband, turn on or off regardless:
         slowFlipState = (delta > 0) ? false : true;
     } else {
