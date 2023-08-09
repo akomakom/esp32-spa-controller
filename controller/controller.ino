@@ -236,8 +236,8 @@ void sendStatus() {
         ESPNowUtils::sendStatusServer();
 
         for (int i = 0 ; i < spaStatus.controls.size() ; i++) {
-//            yield(); // this really slows down updates
-//            sleep(1);
+            yield(); // this really slows down updates
+            delay(1);
             SpaControl* control = spaStatus.controls[i];
             ESPNowUtils::outgoingStatusControl.control_id = i;
             ESPNowUtils::outgoingStatusControl.min = control->min;
