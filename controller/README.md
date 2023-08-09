@@ -1,5 +1,8 @@
 
+### Hardware 
 
+Any ESP32 with enough pins to drive relays should work.  A pre-integrated dev board with relays can save some time.
+![controller-installed.png](readme%2Fcontroller-installed.png)
 
 ### Software Installation 
 #### Libraries
