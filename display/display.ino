@@ -14,9 +14,19 @@
 
 #ifdef GRAPHICS_ENABLE
 
+const char * MODE_MAPPING[] = { "OFF", "ON", "HIGH" };
+
+lv_obj_t * mainScreen = NULL;
+
+// These get passed as pointers to lv events
+int8_t sensorBasedControlPanelIncrement = 1;
+int8_t sensorBasedControlPanelDecrement = -1;
+int8_t sensorBasedControlPanelReset = 0;
+
 lv_obj_t * sensorBasedControlPanel = NULL;
-lv_obj_t * sensorBasedControlSpinbox = NULL;
+lv_obj_t * sensorBasedControlSetpointLabel = NULL;
 lv_obj_t * sensorBasedControlDescription = NULL;
+u_int8_t   sensorBasedControlSetpointValue = 0;
 
 lv_style_t style;
 lv_style_t styleNoPadding;
@@ -50,7 +60,7 @@ unsigned long statusDisplayTime = 0;
 void showStatusMessage(const char *messageFormat, ...) {
     va_list args;
     va_start(args, messageFormat);
-    char msg[100];
+    static char msg[100];
     vsprintf(msg, messageFormat, args);
     Serial.printf("Status Message: %s\n", msg);
 #ifdef GRAPHICS_ENABLE
@@ -76,6 +86,13 @@ void clearStatusMessage() {
 
 
 void initUI() {
+
+    mainScreen = lv_scr_act();
+
+    createSensorBasedDialog();
+
+    lv_scr_load(mainScreen);
+
     // style for button panel
     lv_style_init(&style);
     lv_style_set_flex_flow(&style, LV_FLEX_FLOW_ROW_WRAP);
@@ -175,9 +192,10 @@ void initUI() {
 //    lv_obj_center(statusLabel);
     TRACE("UI 6");
 
-    createSensorBasedDialog();
+    lv_timer_create(updateStatusBar, 100,  NULL);
+    lv_timer_create(updateButtons, 500,  NULL);
 
-
+    TRACE("UI 7");
 }
 
 void createSensorBasedDialog() {
@@ -187,16 +205,23 @@ void createSensorBasedDialog() {
     static lv_coord_t row_dsc[] = {lv_pct(10), lv_pct(40), lv_pct(40), LV_GRID_TEMPLATE_LAST};
 
     // dialog (can it be created on the active screen?  I want it to be a background layer)
-    sensorBasedControlPanel = lv_obj_create(lv_scr_act());
-    lv_obj_set_size(sensorBasedControlPanel, lv_pct(90), lv_pct(90));
+    sensorBasedControlPanel = lv_obj_create(NULL);
+    TRACE("mbox 1");
+    lv_scr_load(sensorBasedControlPanel);
+    TRACE("mbox 1.1");
+//    lv_obj_add_flag(sensorBasedControlPanel, LV_OBJ_FLAG_HIDDEN);
+    TRACE("mbox 1.2");
+//    lv_obj_move_background(sensorBasedControlPanel);
+    TRACE("mbox 1.3");
+//    lv_obj_set_size(sensorBasedControlPanel, lv_pct(90), lv_pct(90));
     lv_obj_add_style(sensorBasedControlPanel, &style, 0);
     lv_obj_add_style(sensorBasedControlPanel, &stylePadding, 0);
     lv_obj_center(sensorBasedControlPanel);
-
+    TRACE("mbox 1.4");
     lv_obj_set_style_grid_column_dsc_array(sensorBasedControlPanel, col_dsc, 0);
     lv_obj_set_style_grid_row_dsc_array(sensorBasedControlPanel, row_dsc, 0);
     lv_obj_set_layout(sensorBasedControlPanel, LV_LAYOUT_GRID);
-
+    TRACE("mbox 1.5");
 
     sensorBasedControlDescription = lv_label_create(sensorBasedControlPanel);
     lv_obj_set_grid_cell(sensorBasedControlDescription, LV_GRID_ALIGN_STRETCH, 0, 3, LV_GRID_ALIGN_STRETCH, 0, 1);
@@ -204,40 +229,54 @@ void createSensorBasedDialog() {
 
     TRACE("mbox 2");
 
-    sensorBasedControlSpinbox = lv_spinbox_create(sensorBasedControlPanel);
-    lv_spinbox_set_range(sensorBasedControlSpinbox, 0, 100); // TODO: adjust range when displaying
-    lv_spinbox_set_digit_format(sensorBasedControlSpinbox, 3, 0);
-    lv_obj_add_style(sensorBasedControlSpinbox, &styleHugeFont, 0);
-//    lv_spinbox_step_prev(sensorBasedControlSpinbox);
-//    lv_obj_set_size(sensorBasedControlSpinbox, 100, lv_pct(40));
-//    lv_obj_center(sensorBasedControlSpinbox);
-    lv_obj_set_grid_cell(sensorBasedControlSpinbox, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
+    sensorBasedControlSetpointLabel = lv_label_create(sensorBasedControlPanel);
+//    lv_spinbox_set_range(sensorBasedControlSetpointLabel, 0, 100); // TODO: adjust range when displaying
+//    lv_spinbox_set_digit_format(sensorBasedControlSetpointLabel, 3, 0);
+    lv_obj_add_style(sensorBasedControlSetpointLabel, &styleHugeFont, 0);
+//    lv_spinbox_step_prev(sensorBasedControlSetpointLabel);
+//    lv_obj_set_size(sensorBasedControlSetpointLabel, 100, lv_pct(40));
+    lv_obj_center(sensorBasedControlSetpointLabel);
+    lv_obj_set_grid_cell(sensorBasedControlSetpointLabel, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
+    TRACE("mbox 3");
 
     lv_coord_t h = lv_pct(40);
 
+    // + Button
     lv_obj_t * btn = lv_btn_create(sensorBasedControlPanel);
     lv_obj_set_size(btn, h, h);
-//    lv_obj_align_to(btn, sensorBasedControlSpinbox, LV_ALIGN_OUT_RIGHT_MID, 5, 0);
     lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_PLUS, 0);
-    lv_obj_add_event_cb(btn, lv_spinbox_increment_event_cb, LV_EVENT_ALL,  NULL);
+    lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_SHORT_CLICKED,        &sensorBasedControlPanelIncrement);
+    lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_LONG_PRESSED_REPEAT,  &sensorBasedControlPanelIncrement);
     lv_obj_set_grid_cell(btn, LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
 
+    TRACE("mbox 4");
+
+    // - Button
     btn = lv_btn_create(sensorBasedControlPanel);
     lv_obj_set_size(btn, h, h);
-//    lv_obj_align_to(btn, sensorBasedControlSpinbox, LV_ALIGN_OUT_LEFT_MID, -5, 0);
     lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_MINUS, 0);
-    lv_obj_add_event_cb(btn, lv_spinbox_decrement_event_cb, LV_EVENT_ALL, NULL);
+    lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_SHORT_CLICKED,        &sensorBasedControlPanelDecrement);
+    lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_LONG_PRESSED_REPEAT,  &sensorBasedControlPanelDecrement);
+
     lv_obj_set_grid_cell(btn, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
 
+    TRACE("mbox 5");
+    // Apply Button
     btn = lv_btn_create(sensorBasedControlPanel);
     lv_obj_set_size(btn, h, h);
-//    lv_obj_align_to(btn, sensorBasedControlSpinbox, LV_ALIGN_OUT_BOTTOM_MID, -5, 0);
     lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_OK, 0);
-    lv_obj_add_event_cb(btn, lv_spinbox_done_event_cb, LV_EVENT_ALL, NULL);
-    lv_obj_set_grid_cell(btn, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
+    lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_set_grid_cell(btn, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
 
-    lv_obj_move_background(sensorBasedControlPanel);
-    TRACE("mbox 5");
+    TRACE("mbox 6");
+    // Reset Button
+    btn = lv_btn_create(sensorBasedControlPanel);
+    lv_obj_set_size(btn, h, h);
+    lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_CLOSE, 0);
+    lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_CLICKED, &sensorBasedControlPanelReset);
+    lv_obj_set_grid_cell(btn, LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
+
+    TRACE("mbox 7");
 }
 
 void setup()
@@ -246,19 +285,16 @@ void setup()
     delay(500);
     // while (!Serial);
     Serial.println("Hot Tub Display Init");
-//    showStatusMessage("Test: %s", "hello");
-
-
 
     showStatusMessage("Total heap: %d", ESP.getHeapSize());
     showStatusMessage("Free heap: %d", ESP.getFreeHeap());
     showStatusMessage("Total PSRAM: %d", ESP.getPsramSize());
     showStatusMessage("Free PSRAM: %d", ESP.getFreePsram());
 
-
 #ifdef GRAPHICS_ENABLE
     showStatusMessage("gfx_init begin: %d", esp_get_free_heap_size());
     gfx_init();
+    initUI();
 //    Serial.println("gfx_init done");
     showStatusMessage("gfx_init done: %d", esp_get_free_heap_size());
 #endif
@@ -268,11 +304,6 @@ void setup()
     ESPNowUtils::registerEspCommStatusCallBackHandler((ESPNowUtils::esp_comm_status_callback)showStatusMessage);
     ESPNowUtils::setup();
 
-#ifdef GRAPHICS_ENABLE
-
-
-    initUI();
-#endif
     Serial.println("Setup done");
 }
 
@@ -285,22 +316,17 @@ void loop()
     ESPNowUtils::loop();
     gfx_loop();
     clearStatusMessage();
-    updateUI();
     delay(5);
 }
 
-void updateUI() {
-    static unsigned long lastUpdate;
-    if (lastUpdate + 100 < millis()) {
-        lastUpdate = millis();
-        lv_label_set_text_fmt(
-                timeLabel,
-                "%s%s %02d:%02d",
-                ESPNowUtils::lastMessageReceivedTime + NET_ACTIVITY_SYMBOL_AGE > millis() ? LV_SYMBOL_DOWN : " ",
-                ESPNowUtils::lastMessageSentTime + NET_ACTIVITY_SYMBOL_AGE > millis() ? LV_SYMBOL_UP : " ",
-                hour(now()),
-                minute(now()));
-    }
+void updateStatusBar(lv_timer_t * timer) {
+    lv_label_set_text_fmt(
+            timeLabel,
+            "%s%s %02d:%02d",
+            ESPNowUtils::lastMessageReceivedTime + NET_ACTIVITY_SYMBOL_AGE > millis() ? LV_SYMBOL_DOWN : " ",
+            ESPNowUtils::lastMessageSentTime + NET_ACTIVITY_SYMBOL_AGE > millis() ? LV_SYMBOL_UP : " ",
+            hour(now()),
+            minute(now()));
 }
 
 void dataReceivedServerStatus(struct_status_server *status) {
@@ -324,80 +350,109 @@ void dataReceivedControlStatus(struct_status_control *status) {
 //    Serial.println();
 //    showStatusMessage("Status: %s value %d min %d max %d.  Up %ds", status->name, status->value, status->min, status->max, esp_timer_get_time() / 1000000);
 
+    // In an attempt at stability, don't update UI elements in the callback, let
+    // an LVGL timer handle that.
+
     // is this a new control? Pick them up in order, starting with 0:
     if (controlButtons.size() == status->control_id) {
         // add it
         TRACE("Control Status 1");
-
         // make a struct for our copy of current info
-        struct_status_control * status_copy = (struct_status_control*) malloc(sizeof(struct_status_control));
+        struct_status_control *status_copy = (struct_status_control *) malloc(sizeof(struct_status_control));
         controlStatuses.push_back(status_copy);
         TRACE("Control Status 2");
-
-        lv_obj_t * singleControlContainer = lv_obj_create(controlButtonContainer);
-        lv_obj_add_style(singleControlContainer, &style, 0);
-        lv_obj_add_style(singleControlContainer, &stylePadding, 0);
-        lv_obj_set_size(singleControlContainer, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-
-        lv_obj_t * btn = lv_btn_create(singleControlContainer);     /*Add a button the current screen*/
-        TRACE("Control Status 2.1");
-        lv_obj_set_size(btn, 140, 50);                          /*Set its size*/
-        lv_obj_align(btn, LV_ALIGN_BOTTOM_MID, 0, 0);
-        TRACE("Control Status 2.2");
-        lv_obj_add_event_cb(btn, btn_event_cb, LV_EVENT_ALL, status_copy);           /*Assign a callback to the button*/
-        TRACE("Control Status 2.3");
-
-        lv_obj_t * led  = lv_led_create(singleControlContainer);
-        lv_obj_set_size(led, 15, 15);
-        lv_obj_align(led, LV_ALIGN_TOP_RIGHT, 0, 0);
-        lv_led_set_brightness(led, 150);
-        lv_led_set_color(led, lv_palette_main(LV_PALETTE_RED));
-        lv_led_off(led);
-
-        lv_obj_t * label = lv_label_create(btn);          /*Add a label to the button*/
-        lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 0);
-        TRACE("Control Status 2.4");
-        lv_label_set_text_fmt(label, "%s", status->name);                     /*Set the labels text*/
-        TRACE("Control Status 2.5");
-        lv_obj_center(label);
-        TRACE("Control Status 3");
-
-        controlButtons.push_back(singleControlContainer);
     }
-    TRACE("Control Status 4");
 
-    // this control (now?) exists
+    // we must have this one already, update it.
     if (controlButtons.size() > status->control_id) {
         // update our copy of the data
         memcpy(controlStatuses[status->control_id], status, sizeof(struct_status_control));
         //        controlButtons[status->control_id]
 //        showStatusMessage("Updating copy of status, max orig %d new %d", status->max, controlStatuses[status->control_id]->max);
-        TRACE("Control Status 5");
+        TRACE("Control Status 4");
+    }
+
+}
+
+void updateButtons(lv_timer_t * timer) {
+    if (controlButtons.size() < controlStatuses.size()) {
+        for (u_int8_t i = 0; i < controlStatuses.size(); i++) {
+            // do we have this control already created?
+            if (controlButtons.size() <= i) {
+                // add this control
+                lv_obj_t *singleControlContainer = lv_obj_create(controlButtonContainer);
+                lv_obj_set_user_data(singleControlContainer, controlStatuses[i]);
+                TRACE("Update Buttons 2.01");
+                lv_obj_add_style(singleControlContainer, &style, 0);
+                TRACE("Update Buttons 2.02");
+                lv_obj_add_style(singleControlContainer, &stylePadding, 0);
+                TRACE("Update Buttons 2.03");
+                lv_obj_set_size(singleControlContainer, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+                TRACE("Update Buttons 2.04");
+
+                lv_obj_t *btn = lv_btn_create(singleControlContainer);
+                TRACE("Update Buttons 2.1");
+                lv_obj_set_size(btn, 140, 50);
+                lv_obj_align(btn, LV_ALIGN_BOTTOM_MID, 0, 0);
+                TRACE("Update Buttons 2.2");
+                lv_obj_add_event_cb(btn, btn_event_cb, LV_EVENT_CLICKED,
+                                    controlStatuses[i]);
+                TRACE("Update Buttons 2.3");
+
+                lv_obj_t *led = lv_led_create(singleControlContainer);
+                lv_obj_set_size(led, 15, 15);
+                lv_obj_align(led, LV_ALIGN_TOP_RIGHT, 0, 0);
+                lv_led_set_brightness(led, 150);
+                lv_led_set_color(led, lv_palette_main(LV_PALETTE_RED));
+                lv_led_off(led);
+
+                lv_obj_t *label = lv_label_create(btn);
+                lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 0);
+                TRACE("Update Buttons 2.4");
+                lv_label_set_text_fmt(label, "%s", controlStatuses[i]->name);
+                TRACE("Update Buttons 2.5");
+                lv_obj_center(label);
+                TRACE("Update Buttons 3");
+
+                controlButtons.push_back(singleControlContainer);
+            }
+        }
+    }
+
+    // Now the two vectors are the same size so it's safe to loop and update
+    for(lv_obj_t *controlButton : controlButtons){
+        struct_status_control *status = (struct_status_control*)lv_obj_get_user_data(controlButton);
+        TRACE("Update Buttons 5");
 
         // 1st child
-        lv_obj_t * btn = lv_obj_get_child(controlButtons[status->control_id], 0);
+        lv_obj_t * btn = lv_obj_get_child(controlButton, 0);
         // 2nd child
-        lv_obj_t * led = lv_obj_get_child(controlButtons[status->control_id], 1);
+        lv_obj_t * led = lv_obj_get_child(controlButton, 1);
+        TRACE("Update Buttons 5.1");
 
         if (status->e_value) {
             lv_led_on(led);
         } else {
             lv_led_off(led);
         }
+        TRACE("Update Buttons 5.2");
+
         // 2nd child
         lv_obj_t * label = lv_obj_get_child(btn, 0);
+        TRACE("Update Buttons 5.3");
+
         if (strcmp(status->type, "off-low-high") == 0 && status->e_value > 0) {
+            TRACE("Update Buttons 5.4");
             lv_label_set_text_fmt(label, "%s (%s)", status->name, status->e_value == 1 ? "LOW" : "HIGH");
+            TRACE("Update Buttons 5.5");
             lv_led_set_color(led, lv_palette_main(status->e_value == 1 ? LV_PALETTE_RED : LV_PALETTE_YELLOW));
         } else if (strcmp(status->type, "sensor-based") == 0) {
             lv_label_set_text_fmt(label, "%s (%d)", status->name, status->value);
-            lv_led_set_color(led, lv_palette_main(LV_PALETTE_RED));
         } else {
             lv_label_set_text(label, status->name);
-            lv_led_set_color(led, lv_palette_main(LV_PALETTE_RED));
         }
     }
-    TRACE("Control Status 6");
+    TRACE("Update Buttons 6");
 
 }
 
@@ -419,13 +474,20 @@ static void btn_event_cb(lv_event_t * e)
             if (strcmp(status->type, "off-low-high") == 0) {
                 overrideTime = status->DO; // since we have three positions, toggle and stay in override.
             }
-            showStatusMessage("Ctrl %s (%d), from %d to %d, min %d max %d ",
-                              status->name,
-                              status->control_id,
-                              status->value,
-                              newValue,
-                              status->min,
-                              status->max);
+//            showStatusMessage("Ctrl %s (%d), from %d to %d, min %d max %d ",
+//                              status->name,
+//                              status->control_id,
+//                              status->value,
+//                              newValue,
+//                              status->min,
+//                              status->max);
+
+            if (overrideTime > 0) {
+                showStatusMessage("Set %s to %s for %d minutes", status->name, MODE_MAPPING[newValue], overrideTime / 60 );
+            } else {
+                showStatusMessage("Set %s to %s (on normal schedule)", status->name, MODE_MAPPING[newValue]);
+            }
+
             ESPNowUtils::sendOverrideCommand(
                     status->control_id,
                     0, // start now
@@ -433,73 +495,85 @@ static void btn_event_cb(lv_event_t * e)
                     newValue
             );
         } else if (strcmp(status->type, "sensor-based") == 0) {
-            lv_obj_set_user_data(sensorBasedControlSpinbox, status);
-            lv_spinbox_set_range(sensorBasedControlSpinbox, status->min, status->max);
-            lv_spinbox_set_value(sensorBasedControlSpinbox, status->value);
+            TRACE("SENS DISP 1");
+            lv_obj_set_user_data(sensorBasedControlSetpointLabel, status);
+            sensorBasedControlSetpointValue = status->value;
+            TRACE("SENS DISP 2");
+//            lv_spinbox_set_range(sensorBasedControlSetpointLabel, status->min, status->max);
+//            lv_spinbox_set_value(sensorBasedControlSetpointLabel, status->value);
+            lv_label_set_text_fmt(sensorBasedControlSetpointLabel, "%d", status->value);
+            TRACE("SENS DISP 2.1");
             lv_label_set_text_fmt(sensorBasedControlDescription, "Adjust setpoint for %s", status->name);
-            lv_obj_move_foreground(sensorBasedControlPanel);
+            TRACE("SENS DISP 3");
+            lv_scr_load_anim(sensorBasedControlPanel, LV_SCR_LOAD_ANIM_OVER_TOP, 500, 10, false);
+//            lv_obj_move_foreground(sensorBasedControlPanel);
+//            lv_obj_clear_flag(sensorBasedControlPanel, LV_OBJ_FLAG_HIDDEN);
+
+            TRACE("SENS DISP END");
         }// otherwise we don't support click.  maybe open a dialog?
     }
 
 }
 
-
-void sensorBasedSetpointCallback(lv_event_t * e)
+static void lv_spinbox_event_cb(lv_event_t * e)
 {
-    lv_obj_t * messageBox = lv_event_get_current_target(e);
-    const char* buttonText = lv_msgbox_get_active_btn_text(messageBox);
-    LV_LOG_USER("Button %s clicked", buttonText);
-    struct_status_control * status = (struct_status_control*) lv_obj_get_user_data(messageBox);
-    Serial.printf("Clicked a dialog button for control %s", status->name);
+    TRACE("SENS CB 1");
+    lv_event_code_t code = lv_event_get_code(e);
+    TRACE("SENS CB 2");
 
-    lv_obj_t * text = lv_msgbox_get_text(messageBox);
-    lv_label_set_text_fmt(text, "Clicked %s", buttonText);
-
-    if (strcmp(buttonText, "Apply") == 0) {
-        // TODO
-        if (messageBox != NULL) {
-            lv_msgbox_close(messageBox);
+    if(lv_event_get_user_data(e) != NULL && (code == LV_EVENT_SHORT_CLICKED || code == LV_EVENT_LONG_PRESSED_REPEAT)) {
+        struct_status_control *status = (struct_status_control *) lv_obj_get_user_data(sensorBasedControlSetpointLabel);
+        int8_t *change = (int8_t*)(lv_event_get_user_data(e));
+        switch(*change) {
+            case 1:
+                if (sensorBasedControlSetpointValue < status->max) {
+                    sensorBasedControlSetpointValue++;
+                }
+                break;
+            case -1:
+                if (sensorBasedControlSetpointValue > status->min) {
+                    sensorBasedControlSetpointValue--;
+                }
+                break;
         }
-        messageBox = NULL;
+        lv_label_set_text_fmt(sensorBasedControlSetpointLabel, "%d", sensorBasedControlSetpointValue);
     }
-}
+    TRACE("SENS CB 3");
 
-static void lv_spinbox_increment_event_cb(lv_event_t * e)
-{
-    lv_event_code_t code = lv_event_get_code(e);
-    if(code == LV_EVENT_SHORT_CLICKED || code  == LV_EVENT_LONG_PRESSED_REPEAT) {
-        lv_spinbox_set_value(sensorBasedControlSpinbox, lv_spinbox_get_value(sensorBasedControlSpinbox) + 1);
+    if (code == LV_EVENT_CLICKED) {
+        struct_status_control *status = (struct_status_control *) lv_obj_get_user_data(
+                sensorBasedControlSetpointLabel);
+        if (lv_event_get_user_data(e) == NULL) {
+            // this is a confirm
+            TRACE("SENS CB 3.1");
+            TRACE("SENS CB 3.2");
+            showStatusMessage("Set %s to %d for %d minutes", status->name, sensorBasedControlSetpointValue,
+                              status->DO / 60);
+            TRACE("SENS CB 3.3");
+            ESPNowUtils::sendOverrideCommand(
+                    status->control_id,
+                    0, // start now
+                    status->DO,
+                    sensorBasedControlSetpointValue
+            );
+            TRACE("SENS CB 3.4");
+         } else if (lv_event_get_user_data(e) == &sensorBasedControlPanelReset) {
+            showStatusMessage("Restoring %s to normal schedule", status->name);
+            TRACE("SENS CB 4.3");
+            ESPNowUtils::sendOverrideCommand(
+                    status->control_id,
+                    0, // start now
+                    0,
+                    status->value // doesn't matter what we pass
+            );
+        }
+//        lv_obj_move_background(sensorBasedControlPanel);
+//        lv_obj_add_flag(sensorBasedControlPanel, LV_OBJ_FLAG_HIDDEN);
+//        lv_scr_load(mainScreen);
+        lv_scr_load_anim(mainScreen, LV_SCR_LOAD_ANIM_OVER_BOTTOM, 500, 10, false);
     }
-}
+    TRACE("SENS CB END");
 
-static void lv_spinbox_decrement_event_cb(lv_event_t * e)
-{
-    lv_event_code_t code = lv_event_get_code(e);
-    if(code == LV_EVENT_SHORT_CLICKED || code == LV_EVENT_LONG_PRESSED_REPEAT) {
-//        lv_spinbox_decrement(sensorBasedControlSpinbox);
-        lv_spinbox_set_value(sensorBasedControlSpinbox, lv_spinbox_get_value(sensorBasedControlSpinbox) - 1);
-    }
-}
-static void lv_spinbox_done_event_cb(lv_event_t * e)
-{
-    if(lv_event_get_code(e) == LV_EVENT_CLICKED) {
-        struct_status_control *status = (struct_status_control *) lv_obj_get_user_data(sensorBasedControlSpinbox);
-        u_int8_t newValue = lv_spinbox_get_value(sensorBasedControlSpinbox);
-        showStatusMessage("Ctrl %s (%d), from %d to %d, min %d max %d ",
-                          status->name,
-                          status->control_id,
-                          status->value,
-                          newValue,
-                          status->min,
-                          status->max);
-        ESPNowUtils::sendOverrideCommand(
-                status->control_id,
-                0, // start now
-                status->DO,
-                newValue
-        );
-        lv_obj_move_background(sensorBasedControlPanel);
-    }
 }
 
 #endif

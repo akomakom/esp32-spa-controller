@@ -180,7 +180,7 @@ bool touch_touched()
   if (ts.touched())
   {
     TS_Point p = ts.getPoint();
-    Serial.printf("Touch Raw remap from %d/%d", p.x, p.y);
+    Serial.printf("Touch Raw remap from %d/%d @%d", p.x, p.y, p.z);
 #if defined(TOUCH_SWAP_XY)
     touch_last_x = map(p.y, TOUCH_MAP_X1, TOUCH_MAP_X2, 0, gfx->width() - 1);
     touch_last_y = map(p.x, TOUCH_MAP_Y1, TOUCH_MAP_Y2, 0, gfx->height() - 1);
