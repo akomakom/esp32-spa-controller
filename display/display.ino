@@ -101,12 +101,13 @@ void initUI() {
 
 
 //    lv_style_set_pad_inner(&style, 1);
-    lv_style_set_pad_top(&style, 10);
-    lv_style_set_pad_bottom(&style, 5);
-    lv_style_set_pad_left(&style, 1);
-    lv_style_set_pad_right(&style, 1);
-    lv_style_set_pad_row(&style, 10);
-    lv_style_set_pad_column(&style, 10);
+//    lv_style_set_pad_top(&style, 10);
+//    lv_style_set_pad_bottom(&style, 5);
+//    lv_style_set_pad_left(&style, 1);
+//    lv_style_set_pad_right(&style, 1);
+//    lv_style_set_pad_row(&style, 10);
+//    lv_style_set_pad_column(&style, 10);
+    lv_style_set_text_align(&style, LV_TEXT_ALIGN_CENTER);
     lv_style_set_text_font(&style, &lv_font_montserrat_20);
 
     lv_style_init(&styleNoPadding);
@@ -121,7 +122,7 @@ void initUI() {
 
 
     lv_style_init(&stylePadding);
-    lv_style_set_pad_top(&stylePadding, 6);
+    lv_style_set_pad_top(&stylePadding, 3);
     lv_style_set_pad_bottom(&stylePadding, 3);
     lv_style_set_pad_left(&stylePadding, 5);
     lv_style_set_pad_right(&stylePadding, 5);
@@ -151,7 +152,7 @@ void initUI() {
     TRACE("UI 2.3");
     lv_obj_align(bannerLabel, LV_ALIGN_LEFT_MID, 0, 0);
     TRACE("UI 2.4");
-    lv_obj_set_style_text_align(bannerLabel, LV_TEXT_ALIGN_CENTER, 0);
+    //lv_obj_set_style_text_align(bannerLabel, LV_TEXT_ALIGN_CENTER, 0);
     //lv_obj_align(bannerLabel, LV_ALIGN_CENTER, 0, -40);
 //    lv_obj_center(bannerLabel);
 
@@ -162,7 +163,7 @@ void initUI() {
     lv_obj_set_width(timeLabel, LV_SIZE_CONTENT);  /*Set smaller width to make the lines wrap*/
 //    lv_obj_set_height(timeLabel, lv_pct(100));
     lv_obj_align(timeLabel, LV_ALIGN_RIGHT_MID, 0, 0);
-    lv_obj_set_style_text_align(timeLabel, LV_TEXT_ALIGN_RIGHT, 0);
+    //lv_obj_set_style_text_align(timeLabel, LV_TEXT_ALIGN_RIGHT, 0);
     //lv_obj_align(timeLabel, LV_ALIGN_CENTER, 0, -40);
 //    lv_obj_center(timeLabel);
 
@@ -172,6 +173,7 @@ void initUI() {
 //    lv_obj_center(controlButtonContainer);
     lv_obj_align(controlButtonContainer, LV_ALIGN_CENTER, 0, 0);
     lv_obj_add_style(controlButtonContainer, &style, 0);
+    lv_obj_add_style(controlButtonContainer, &styleNoPadding, 0);
 
     // bottom thing
     lv_obj_t * bottom_thing = lv_obj_create(lv_scr_act());
@@ -187,7 +189,7 @@ void initUI() {
     lv_label_set_text(statusLabel, "Starting");
     lv_obj_set_width(statusLabel, LV_SIZE_CONTENT);  /*Set smaller width to make the lines wrap*/
 //    lv_obj_set_height(statusLabel, lv_pct(100));
-    lv_obj_set_style_text_align(statusLabel, LV_TEXT_ALIGN_CENTER, 0);
+    //lv_obj_set_style_text_align(statusLabel, LV_TEXT_ALIGN_CENTER, 0);
     //lv_obj_align(statusLabel, LV_ALIGN_CENTER, 0, -40);
 //    lv_obj_center(statusLabel);
     TRACE("UI 6");
@@ -202,11 +204,12 @@ void initUI() {
 void createSensorBasedDialog() {
 
 
-    static lv_coord_t col_dsc[] = {lv_pct(30), lv_pct(30), lv_pct(30), LV_GRID_TEMPLATE_LAST};
+    static lv_coord_t col_dsc[] = {lv_pct(20), lv_pct(20), lv_pct(20), LV_GRID_TEMPLATE_LAST};
     static lv_coord_t row_dsc[] = {lv_pct(10), lv_pct(40), lv_pct(40), LV_GRID_TEMPLATE_LAST};
 
     // dialog (can it be created on the active screen?  I want it to be a background layer)
     sensorBasedControlPanel = lv_obj_create(NULL);
+
     TRACE("mbox 1");
     lv_scr_load(sensorBasedControlPanel);
     TRACE("mbox 1.1");
@@ -216,15 +219,17 @@ void createSensorBasedDialog() {
     TRACE("mbox 1.3");
 //    lv_obj_set_size(sensorBasedControlPanel, lv_pct(90), lv_pct(90));
     lv_obj_add_style(sensorBasedControlPanel, &style, 0);
-    lv_obj_add_style(sensorBasedControlPanel, &styleNoPadding, 0);
+//    lv_obj_add_style(sensorBasedControlPanel, &styleNoPadding, 0);
     lv_obj_center(sensorBasedControlPanel);
     TRACE("mbox 1.4");
     lv_obj_set_style_grid_column_dsc_array(sensorBasedControlPanel, col_dsc, 0);
     lv_obj_set_style_grid_row_dsc_array(sensorBasedControlPanel, row_dsc, 0);
     lv_obj_set_layout(sensorBasedControlPanel, LV_LAYOUT_GRID);
+    lv_obj_set_grid_align(sensorBasedControlPanel, LV_GRID_ALIGN_SPACE_BETWEEN, LV_GRID_ALIGN_SPACE_BETWEEN);
     TRACE("mbox 1.5");
 
     sensorBasedControlDescription = lv_label_create(sensorBasedControlPanel);
+    //lv_obj_set_style_text_align(sensorBasedControlDescription, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_grid_cell(sensorBasedControlDescription, LV_GRID_ALIGN_STRETCH, 0, 3, LV_GRID_ALIGN_STRETCH, 0, 1);
 
 
@@ -237,6 +242,7 @@ void createSensorBasedDialog() {
 //    lv_spinbox_step_prev(sensorBasedControlSetpointLabel);
 //    lv_obj_set_size(sensorBasedControlSetpointLabel, 100, lv_pct(40));
     lv_obj_center(sensorBasedControlSetpointLabel);
+    //lv_obj_set_style_text_align(sensorBasedControlSetpointLabel, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_grid_cell(sensorBasedControlSetpointLabel, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
     TRACE("mbox 3");
 
@@ -250,6 +256,7 @@ void createSensorBasedDialog() {
     lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_LONG_PRESSED_REPEAT,  &sensorBasedControlPanelIncrement);
     lv_obj_set_grid_cell(btn, LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
 
+
     TRACE("mbox 4");
 
     // - Button
@@ -258,24 +265,34 @@ void createSensorBasedDialog() {
     lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_MINUS, 0);
     lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_SHORT_CLICKED,        &sensorBasedControlPanelDecrement);
     lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_LONG_PRESSED_REPEAT,  &sensorBasedControlPanelDecrement);
-
     lv_obj_set_grid_cell(btn, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
+
 
     TRACE("mbox 5");
     // Apply Button
     btn = lv_btn_create(sensorBasedControlPanel);
     lv_obj_set_size(btn, h, h);
-    lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_OK, 0);
+//    lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_OK, 0);
     lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_set_grid_cell(btn, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
+
+    lv_obj_t * btnLabel = lv_label_create(btn);
+    lv_label_set_text(btnLabel, "OK");
+    //lv_obj_set_style_text_align(btnLabel, LV_TEXT_ALIGN_CENTER, 0);
+
 
     TRACE("mbox 6");
     // Reset Button
     btn = lv_btn_create(sensorBasedControlPanel);
     lv_obj_set_size(btn, h, h);
-    lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_CLOSE, 0);
+//    lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_CLOSE, 0);
     lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_CLICKED, &sensorBasedControlPanelReset);
     lv_obj_set_grid_cell(btn, LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
+
+    btnLabel = lv_label_create(btn);
+    lv_label_set_text(btnLabel, "Cancel");
+    //lv_obj_set_style_text_align(btnLabel, LV_TEXT_ALIGN_CENTER, 0);
+
 
     TRACE("mbox 7");
 }
@@ -333,7 +350,9 @@ void dataReceivedServerStatus(struct_status_server *status) {
 //    showStatusMessage("Status: %s value %d min %d max %d.  Up %d", status->name, status->value, status->min, status->max, now());
     // set time from server
     setTime(status->time + status->tz_offset);
+    gfx_set_screen_timeout(status->touchscreen_timeout * 1000);
     TRACE("Set Time");
+//    Serial.printf("Received touchscreen timeout %d, last touch time %d, millis %d, remaining time %d, bright %d", status->touchscreen_timeout, last_gfx_touch_time, millis(), (last_gfx_touch_time + gfx_screen_timeout) - millis(), displayBrightness);
 
     if (bannerLabel != NULL && timeLabel != NULL) { // already initialized
         lv_label_set_text_fmt(bannerLabel, "%s @%.1fF ", status->server_name, status->water_temp);
@@ -392,7 +411,7 @@ void updateButtons(lv_timer_t * timer) {
 
                 lv_obj_t *btn = lv_btn_create(singleControlContainer);
                 //TRACE("Update Buttons 2.1");
-                lv_obj_set_size(btn, 140, 50);
+                lv_obj_set_size(btn, 140, 60);
                 lv_obj_align(btn, LV_ALIGN_BOTTOM_MID, 0, 0);
                 //TRACE("Update Buttons 2.2");
                 lv_obj_add_event_cb(btn, btn_event_cb, LV_EVENT_CLICKED,

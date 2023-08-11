@@ -71,13 +71,18 @@ Arduino_RPi_DPI_RGBPanel *gfx = new Arduino_RPi_DPI_RGBPanel(
 
 #include "touch.h"
 
+#define BRIGHTNESS_FULL 255
+#define BRIGHTNESS_DIM  40
+#define BRIGHTNESS_OFF  0
+
 static uint32_t screenWidth;
 static uint32_t screenHeight;
 static lv_disp_draw_buf_t draw_buf;
 static lv_color_t *disp_draw_buf;
 static lv_disp_drv_t disp_drv;
 static unsigned long last_gfx_touch_time = 0;
-#define BL_TIMEOUT 60000
+static unsigned long gfx_screen_timeout = 60000;
+static u_int8_t displayBrightness = BRIGHTNESS_FULL;
 
 /* Display flushing */
 void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p)
@@ -94,9 +99,6 @@ void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color
     lv_disp_flush_ready(disp);
 }
 
-void gfx_backlight(bool on) {
-    digitalWrite(TFT_BL, on ? HIGH : LOW);
-}
 
 void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 {
@@ -125,7 +127,20 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 }
 
 void gfx_loop() {
-    gfx_backlight((last_gfx_touch_time + BL_TIMEOUT) > millis());
+    // dim the screen after half the screen timeout
+    long remaining_millis = (last_gfx_touch_time + gfx_screen_timeout) - millis();
+    if (remaining_millis > (long)(gfx_screen_timeout / 2)) {
+        displayBrightness = BRIGHTNESS_FULL;
+    } else if (remaining_millis > 0) {
+        displayBrightness = BRIGHTNESS_DIM;
+    } else {
+        displayBrightness = BRIGHTNESS_OFF;
+    }
+    analogWrite(TFT_BL, displayBrightness);
+}
+
+void gfx_set_screen_timeout(unsigned long timeout) {
+    gfx_screen_timeout = timeout;
 }
 
 void gfx_init() {

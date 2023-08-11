@@ -85,15 +85,16 @@ void SpaControlScheduler::persist(const char* eepromKey) {
     }
 }
 void SpaControlScheduler::load(const char* eepromKey) {
-    SpaSchedulerNormalSettings settings;
+
     Serial.print("Retrieving values from eeprom for key");
     Serial.println(eepromKey);
 
-    if (app_preferences.getBytes(eepromKey, &settings, sizeof(settings))) {
+    if (app_preferences.getBytes(eepromKey, &normalSettings, sizeof(normalSettings))) {
         // apply so that math can be precalculated
-        Serial.println("Retrieved values from eeprom, eg");
-        Serial.println(settings.percentageOfDayOnTime);
-        normalSchedule(settings.percentageOfDayOnTime, settings.numberOfTimesToRun, settings.normalValueOn, settings.normalValueOff);
+        Serial.print("Retrieved values from eeprom, eg: ");
+        Serial.println(normalSettings.percentageOfDayOnTime);
+        // apply the settings to precalculate other non-persisted variables
+        normalSchedule(normalSettings.percentageOfDayOnTime, normalSettings.numberOfTimesToRun, normalSettings.normalValueOn, normalSettings.normalValueOff);
     }
 }
 

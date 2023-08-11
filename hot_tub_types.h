@@ -30,6 +30,8 @@ typedef struct struct_status_server {
     float water_temp;
     int tz_offset = 0;
     char server_name[20] = "Hot Tub";
+    u_int8_t control_count = 0;
+    u_int16_t touchscreen_timeout = 0; // 0 is never
 } struct_status_server;
 
 typedef struct struct_status_control {

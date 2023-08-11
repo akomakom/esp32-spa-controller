@@ -11,6 +11,7 @@
 #include "time.h"
 #include "sntp.h"
 
+extern const char * PREFERENCES_NAME;
 extern Preferences app_preferences;
 extern struct tm *main_device_time;
 extern int timezone_offset;

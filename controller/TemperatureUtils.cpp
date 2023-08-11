@@ -58,8 +58,6 @@ void TemperatureUtils::setup() {
     readTemperatures(); // ensure we have some data
 
 
-
-
     /***** This is not yet used *****/
     /**
      * TODO: dynamic mapping of DeviceAddress to role with a UI to configure

@@ -114,7 +114,7 @@ void setupNTP() {
 void setup(void) {
     Serial.begin(115200);
 
-    if (!app_preferences.begin("hot-tub")) {
+    if (!app_preferences.begin(PREFERENCES_NAME)) {
         Serial.println("Unable to open preferences");
     }
 
@@ -228,7 +228,10 @@ void sendStatus() {
 
         ESPNowUtils::outgoingStatusServer.time = mktime(main_device_time);
         ESPNowUtils::outgoingStatusServer.tz_offset = timezone_offset;
-        ESPNowUtils::outgoingStatusServer.water_temp = spaStatus.temperatureUtils.getTempF(0);;
+        // TODO: move this to a dynamic thing of some sort
+        ESPNowUtils::outgoingStatusServer.water_temp = spaStatus.temperatureUtils.getTempF(0);
+        ESPNowUtils::outgoingStatusServer.control_count = spaStatus.controls.size();
+        ESPNowUtils::outgoingStatusServer.touchscreen_timeout = 300;
 
         // TODO:
 //        ESPNowUtils::outgoingStatusServer.server_name =
