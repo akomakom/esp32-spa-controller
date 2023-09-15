@@ -115,9 +115,9 @@ void ESPNowUtils::OnDataRecv(const uint8_t * mac_addr, const uint8_t *incomingDa
 PairingStatus ESPNowUtils::autoPairing(){
     switch(pairingStatus) {
         case PAIR_REQUEST:
-            Serial.print("Pairing request on channel "  );
+//            Serial.printf("Pairing request on channel "  );
             espCommCallback("Pairing request on ch %d", channel);
-            Serial.println(channel);
+//            Serial.println(channel);
 
             // set WiFi channel
             ESP_ERROR_CHECK(esp_wifi_set_channel(channel,  WIFI_SECOND_CHAN_NONE));

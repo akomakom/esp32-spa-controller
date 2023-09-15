@@ -75,12 +75,18 @@ Arduino_RPi_DPI_RGBPanel *gfx = new Arduino_RPi_DPI_RGBPanel(
 #define BRIGHTNESS_DIM  40
 #define BRIGHTNESS_OFF  0
 
+// After waking up (backlight on after the first touch event),
+// ignore touch event for this much time to avoid accidental
+// control activation
+#define GFX_IGNORE_TOUCH_ON_WAKE_MILLIS 1000
+
 static uint32_t screenWidth;
 static uint32_t screenHeight;
 static lv_disp_draw_buf_t draw_buf;
 static lv_color_t *disp_draw_buf;
 static lv_disp_drv_t disp_drv;
 static unsigned long last_gfx_touch_time = 0;
+static unsigned long gfx_ignore_touch_until = 0;
 static unsigned long gfx_screen_timeout = 60000;
 static u_int8_t displayBrightness = BRIGHTNESS_FULL;
 
@@ -100,13 +106,25 @@ void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color
 }
 
 
+long gfx_screen_timeout_remaining_millis() {
+    return (last_gfx_touch_time + gfx_screen_timeout) - millis();
+}
+
 void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 {
     if (touch_has_signal())
     {
         if (touch_touched())
         {
-            last_gfx_touch_time = millis();
+            if (gfx_screen_timeout_remaining_millis() < 0) {
+                // screen was off when this touch event occurred, prevent touch to avoid accidental press
+                gfx_ignore_touch_until = millis() + GFX_IGNORE_TOUCH_ON_WAKE_MILLIS;
+            }
+            last_gfx_touch_time = millis(); // wake up regardless
+            if (gfx_ignore_touch_until > millis()) {
+                Serial.printf("Ignoring touch for another %d millis", (gfx_ignore_touch_until - millis()));
+                return;
+            }
 
             data->state = LV_INDEV_STATE_PR;
 
@@ -126,9 +144,10 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
     }
 }
 
+
 void gfx_loop() {
     // dim the screen after half the screen timeout
-    long remaining_millis = (last_gfx_touch_time + gfx_screen_timeout) - millis();
+    long remaining_millis = gfx_screen_timeout_remaining_millis();
     if (remaining_millis > (long)(gfx_screen_timeout / 2)) {
         displayBrightness = BRIGHTNESS_FULL;
     } else if (remaining_millis > 0) {
