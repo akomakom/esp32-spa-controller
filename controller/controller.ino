@@ -12,11 +12,16 @@
 // Interval at which to publish sensor readings
 #define ESP_STATUS_SEND_INTERVAL  10000
 
+#define NTP_SYNC_INTERVAL 3600 * 1000
+// If we don't get NTP sync success for this long, reboot (assume that network failed)
+#define NTP_SYNC_FAIL_REBOOT_INTERVAL NTP_SYNC_INTERVAL * 2
+
 // TimeZone rule including daylight adjustment rules (optional)
 // TODO: move to Preferences
 const char* time_zone = "EST5EDT,M3.2.0,M11.1.0";
 const char* ntpServer1 = "pool.ntp.org";
 const char* ntpServer2 = "time.nist.gov";
+unsigned long  ntp_last_sync_success_time = 0;
 
 SpaStatus spaStatus;
 // Stores last time status was published on esp-now
@@ -82,10 +87,12 @@ void timeavailable(struct timeval *t)
 {
     Serial.println("Got time adjustment from NTP!");
     setDeviceTime();
+    ntp_last_sync_success_time = millis();
 }
 
 void setupNTP() {
     sntp_set_time_sync_notification_cb( timeavailable );
+    sntp_set_sync_interval(NTP_SYNC_INTERVAL) ; // This is probably default, but I want to make sure it's set to an hour.
     /**
      * NTP server address could be aquired via DHCP,
      *
@@ -214,6 +221,12 @@ void loop(void) {
     sendStatus();
     yield();
 //    sleep(5);
+
+    // reboot check
+    if ((millis() - ntp_last_sync_success_time) > NTP_SYNC_FAIL_REBOOT_INTERVAL) {
+        Serial.printf("We have not seen an NTP update in over %d, assuming network broke, rebooting", NTP_SYNC_FAIL_REBOOT_INTERVAL);
+        ESP.restart();
+    }
 }
 
 void peerAdded(struct_pairing pairing) {
