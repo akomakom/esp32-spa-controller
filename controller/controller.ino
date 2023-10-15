@@ -118,6 +118,26 @@ void setupNTP() {
     configTzTime(time_zone, ntpServer1, ntpServer2);
 }
 
+void setupWIFI() {
+
+    // delete old config
+    WiFi.disconnect(true);
+
+    delay(1000);
+
+    WiFi.onEvent(WiFiStationConnected, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED);
+    WiFi.onEvent(WiFiGotIP, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP);
+    WiFi.onEvent(WiFiStationDisconnected, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+
+    // To support ESP-NOW
+    // Set the device as a Station and Soft Access Point simultaneously
+    WiFi.mode(WIFI_AP_STA);
+    // Connect to WiFi network
+    WiFi.begin(WIFI_NAME, WIFI_PASS);
+    Serial.printf("WiFi begin called");
+    delay(1000);
+}
+
 void setup(void) {
     Serial.begin(115200);
 
@@ -127,18 +147,7 @@ void setup(void) {
 
     setupNTP();
 
-    // To support ESP-NOW
-    // Set the device as a Station and Soft Access Point simultaneously
-    WiFi.mode(WIFI_AP_STA);
-    // Connect to WiFi network
-    WiFi.begin(WIFI_NAME, WIFI_PASS);
-    Serial.println("");
-
-    Serial.print("Connected to ");
-    Serial.print(WIFI_NAME);
-    Serial.print(" IP address: ");
-    Serial.print(WiFi.localIP());
-    Serial.println("");
+    setupWIFI();
 
 //    /*use mdns for host name resolution*/
 //    if (!MDNS.begin(WIFI_HOST)) { //http://esp32.local
@@ -287,4 +296,29 @@ void espnowCommandReceived(struct_command *command) {
             command->value
     );
 
+}
+
+
+// WIFI:
+
+void WiFiStationConnected(WiFiEvent_t event, WiFiEventInfo_t info){
+    Serial.println("Connected to AP successfully!");
+    Serial.println("");
+
+    Serial.print("Connected to ");
+    Serial.print(WIFI_NAME);
+}
+
+void WiFiGotIP(WiFiEvent_t event, WiFiEventInfo_t info){
+    Serial.println("WiFi connected");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
+}
+
+void WiFiStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info){
+    Serial.println("Disconnected from WiFi access point");
+    Serial.print("WiFi lost connection. Reason: ");
+    Serial.println(info.wifi_sta_disconnected.reason);
+    Serial.println("Trying to Reconnect");
+    WiFi.begin(WIFI_NAME, WIFI_PASS);
 }
