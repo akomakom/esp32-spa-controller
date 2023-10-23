@@ -173,6 +173,23 @@
             // assign input field values by matching ids to json property names
             $(input).val(data[$(input).attr('id')]);
           });
+          $('#percentageOfDayOnTime').on('change keyup paste', function() {
+            $('#percentageOfDayOnTimeHours').val(
+                    humanizeDuration(
+                            $(this).val() * 24 * 3600000 / 100,
+                            {largest: 2, round: false}
+                    )
+            );
+            $('#numberOfTimesToRun').trigger('change'); //update hours per period
+          }).trigger('change');
+          $('#numberOfTimesToRun').on('change keyup paste', function() {
+            $('#numberOfTimesToRunHours').val(humanizeDuration(
+                    $('#percentageOfDayOnTime').val() * 24 * 3600000 / 100 / $(this).val(),
+                    {largest: 2, round: true}
+            ));
+          }).trigger('change');
+
+
           $("#control-config-dialog-form").find('input.validate-min-max')
                   .attr('min', controlData['min'])
                   .attr('max', controlData['max'])
@@ -457,15 +474,26 @@
   <h2>Configure Normal (Daily) Schedule</h2>
   <form>
     <input type="number" id="percentageOfDayOnTime" class="validate-percent" min="0" max="100"/>
-    <label for="percentageOfDayOnTime">Percentage Of Day This Control Should Be "ON"</label><br>
+    <label for="percentageOfDayOnTime">Percentage Of Day This Control Should Be "ON"</label>
+    <br>
+    <input id="percentageOfDayOnTimeHours" disabled="disabled"/>
+    <label for="percentageOfDayOnTimeHours">Total Daily Runtime</label>
+    <br>
     <input type="number" id="numberOfTimesToRun" class="validate-unsigned" min="0"/>
-    <label for="numberOfTimesToRun">Number of "ON" periods during a day</label><br>
+    <label for="numberOfTimesToRun">Number of "ON" periods during a day</label>
+    <br>
+    <input id="numberOfTimesToRunHours" disabled="disabled"/>
+    <label for="numberOfTimesToRunHours">Per Run Period</label>
+    <br>
     <input type="number" id="normalValueOn" class="validate-min-max"/>
-    <label for="normalValueOn">* Value of control when scheduled to be "ON"</label><br>
+    <label for="normalValueOn">* Value of control when scheduled to be "ON"</label>
+    <br>
     <input type="number" id="normalValueOff" class="validate-min-max"/>
-    <label for="normalValueOff">* Value of control when scheduled to be "OFF"</label><br>
+    <label for="normalValueOff">* Value of control when scheduled to be "OFF"</label>
+    <br>
     <input type="number" id="overrideDefaultDurationSeconds" class="validate-unsigned"/>
-    <label for="overrideDefaultDurationSeconds">Default (override) duration when turning on/off</label><br>
+    <label for="overrideDefaultDurationSeconds" min="0">Default (override) duration when turning on/off, seconds</label>
+    <br>
     <div>*Valid values are <span class="min"></span> to <span class="max"></span></div>
 
   </form>

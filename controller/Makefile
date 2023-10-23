@@ -31,7 +31,7 @@ upload: compile
 	 ${ARDUINO_CLI} upload -p ${PORT} --fqbn ${FQBN} --discovery-timeout 30s . -v
 
 # POST binary firmware to /upload endpoint instead of via USB
-upload-via-http: compile
+upload-via-http: compile guard-TARGET_IP
 	curl -v --progress-bar -F update=@build/${FQBN_PATH}/${INO}.bin http://${TARGET_IP}/update
 
 # Serial console of the board
