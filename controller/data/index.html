@@ -338,7 +338,7 @@
                       .on('click', durationChoiceHandler)
                       .attr('value', controlData['value'])
                       .attr('name', controlData['name']);
-              control.data('status', controlData);
+
               control.find('.control-configure').on('click', configControlHandler);
 
               control.find('.control-dependent')
@@ -349,10 +349,17 @@
                 case 'sensor-based':
                   // TODO: unhardcode default duration
                   let defaultDuration = 60;
+
                   controlButton.on('click', function () {
                     let newTemp = prompt("Temperature");
                     if (newTemp) {
-                      setOverrideClickHandler(controlData['name'], defaultDuration, newTemp, updateStatus);
+                      setOverrideClickHandler(
+                              controlData['name'],
+                              // look that up in up-to-date data store, not the closure-local copy that's out of date
+                              (control.data('status')['ORT'] > 0) ? control.data('status')['ORT']/60 : defaultDuration,
+                              newTemp,
+                              updateStatus
+                      );
                     }
                   });
 
@@ -364,7 +371,12 @@
                     let currentValue = parseInt(controlButton.attr('value'));
                     control.find('.control-state').text(valNames[currentValue + changeDelta]); //duplicated below
                     clickTimeout = setTimeout(function(){
-                      setOverrideClickHandler(controlData['name'], defaultDuration, changeDelta + currentValue, updateStatus);
+                      setOverrideClickHandler(
+                              controlData['name'],
+                              // look that up in up-to-date data store, not the closure-local copy that's out of date
+                              (control.data('status')['ORT'] > 0) ? control.data('status')['ORT']/60 : defaultDuration,
+                              changeDelta + currentValue,
+                              updateStatus);
                       changeDelta = 0;
                     }, 500);
                   }
@@ -388,7 +400,7 @@
 
             controlButton.attr('value', controlData['value']);
             scheduler.attr('value', controlData['value']);
-
+            control.data('status', controlData);
             control.find('.control-name').text(controlData['name']);
             control.find('.control-state').text(valNames[controlData['value']]);
             control.find('.scheduler-ort').text(humanizeDuration(controlData['ORT'] * 1000,  { round: true, largest: 1  }));

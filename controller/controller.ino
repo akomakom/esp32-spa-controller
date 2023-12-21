@@ -14,7 +14,7 @@
 
 #define NTP_SYNC_INTERVAL 3600 * 1000
 // If we don't get NTP sync success for this long, reboot (assume that network failed)
-#define NTP_SYNC_FAIL_REBOOT_INTERVAL NTP_SYNC_INTERVAL * 2
+#define NTP_SYNC_FAIL_REBOOT_INTERVAL NTP_SYNC_INTERVAL * 24
 
 // TimeZone rule including daylight adjustment rules (optional)
 // TODO: move to Preferences

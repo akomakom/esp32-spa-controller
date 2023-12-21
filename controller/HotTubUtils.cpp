@@ -174,7 +174,11 @@ SpaControl::SpaControl(const char *name, const char *type) {
 }
 
 void SpaControl::toggle() {
-    scheduleOverride(now(), now() + normalSettings.overrideDefaultDurationSeconds, getNextValue());
+    scheduleOverride(
+            now(),
+            now() + ((getOverrideScheduleRemainingTime() > 0) ?
+                getOverrideScheduleRemainingTime() : normalSettings.overrideDefaultDurationSeconds),
+            getNextValue());
 //    Serial.println("PARENT!!! Value after toggle is ");
 //    Serial.println(getEffectiveValue());
 }
