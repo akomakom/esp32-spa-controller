@@ -275,7 +275,8 @@ void TwoSpeedSpaControl::applyOutputs() {
 SensorBasedControl::SensorBasedControl(const char *name, u_int8_t pin, u_int8_t sensorIndex, u_int8_t swing, time_t postShutdownOnTime, TemperatureUtils* temps) : SpaControl(name, "sensor-based") {
     this->pin = pin;
     this->sensorIndex = sensorIndex;
-    this->min = 60; // using Fahrenheit because there is better resolution with integers
+    // Default limits:
+    this->min = 0; // using Fahrenheit because there is better resolution with integers
     this->max = 104;
     this->swing = swing;
     this->postShutdownOnTime = postShutdownOnTime;
@@ -382,10 +383,10 @@ SpaControl *SpaStatus::findByName(const char *name) {
 
 void SpaStatus::setup() {
 
-    // Defaults:
-    pump->normalSchedule(50, 2, 1, 0); // TODO: Save preferences and build a UI to modify
-    heater->normalSchedule(100, 1, heater->max, heater->min); // always on, set to max temp
-    pump->neededBy(heater, 1, 1);
+    // Defaults until UI configures these values:
+    pump->normalSchedule(50, 2, 1, 0);
+    // always on, set to max temp, keep above freezing when scheduled to be off from UI
+    heater->normalSchedule(100, 1, heater->max, std::max(heater->min, (u_int8_t)40)); pump->neededBy(heater, 1, 1);
     ozone->lockedTo(pump, SpaControlDependencies::SPECIAL_VALUE_ANY_GREATER_THAN_ZERO, 1);
 
     Serial.println("About to iterate and load settings");
