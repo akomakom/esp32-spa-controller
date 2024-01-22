@@ -24,13 +24,14 @@ void SpaControlDependencies::lockedTo(SpaControl *otherControl, u_int8_t otherCo
 u_int8_t SpaControlDependencies::getDependencyValue(SpaControl* other, u_int8_t otherValue, u_int8_t ourValue) {
     u_int8_t result = SPECIAL_RETURN_VALUE_NOT_IN_EFFECT;
     if (other != NULL) {
-        if (otherValue == other->getEffectiveValueForDependents()) {
+        u_int8_t otherOnValue = other->getOnStateForDependents();
+        if (otherValue == otherOnValue) {
             result = ourValue;
-        } else if (otherValue == SPECIAL_VALUE_ANY_GREATER_THAN_ZERO && other->getEffectiveValueForDependents() > 0) {
+        } else if (otherValue == SPECIAL_VALUE_ANY_GREATER_THAN_ZERO && otherOnValue > 0) {
             result = ourValue;
         }
         if (result == SPECIAL_VALUE_ANY_GREATER_THAN_ZERO) {
-            result = other->getEffectiveValueForDependents(); // use the same value for us
+            result = otherOnValue; // use the same value for us
         }
     }
     return result;
@@ -184,18 +185,25 @@ void SpaControl::toggle() {
 }
 
 u_int8_t SpaControl::getEffectiveValue() {
+//    Serial.printf("GetEffectiveValue %s\n", name);
     if (isOverrideScheduleEnabled()) {
         return getOverrideValue();
     }
+//    Serial.printf("GetEffectiveValue 2 %s\n", name);
     u_int8_t dependencyValue = getDependencyValue();
     if (dependencyValue != SpaControlDependencies::SPECIAL_RETURN_VALUE_NOT_IN_EFFECT) {
         return dependencyValue;
     }
+//    Serial.printf("GetEffectiveValue done %s", name);
     return getScheduledValue();
 }
 
-u_int8_t SpaControl::getEffectiveValueForDependents() {
+u_int8_t SpaControl::getOnState() {
     return getEffectiveValue();
+}
+
+u_int8_t SpaControl::getOnStateForDependents() {
+    return getOnState();
 }
 
 void SpaControl::applyOutputs() {}
@@ -231,6 +239,7 @@ void SimpleSpaControl::toggle() {
 }
 
 void SimpleSpaControl::applyOutputs() {
+//    Serial.printf("Applying outputs for %s", name);
     digitalWrite(pin, getEffectiveValue() ? HIGH : LOW);
 }
 
@@ -246,6 +255,7 @@ void TwoSpeedSpaControl::toggle() {
 }
 
 void TwoSpeedSpaControl::applyOutputs() {
+//    Serial.printf("Applying outputs for %s", name);
     switch (getEffectiveValue()) {
         case 0:
             digitalWrite(pinPower, 0);
@@ -262,12 +272,13 @@ void TwoSpeedSpaControl::applyOutputs() {
     }
 }
 
-SensorBasedControl::SensorBasedControl(const char *name, u_int8_t pin, u_int8_t sensorIndex, u_int8_t swing, TemperatureUtils* temps) : SpaControl(name, "sensor-based") {
+SensorBasedControl::SensorBasedControl(const char *name, u_int8_t pin, u_int8_t sensorIndex, u_int8_t swing, time_t postShutdownOnTime, TemperatureUtils* temps) : SpaControl(name, "sensor-based") {
     this->pin = pin;
     this->sensorIndex = sensorIndex;
     this->min = 60; // using Fahrenheit because there is better resolution with integers
     this->max = 104;
     this->swing = swing;
+    this->postShutdownOnTime = postShutdownOnTime;
     this->temperatureUtils = temps;
 
     pinMode(pin, OUTPUT);
@@ -277,7 +288,7 @@ SensorBasedControl::SensorBasedControl(const char *name, u_int8_t pin, u_int8_t 
  * Dependents don't care obout our temperature threshold, they care whether we are on or off
  * @return
  */
-u_int8_t SensorBasedControl::getEffectiveValueForDependents() {
+u_int8_t SensorBasedControl::getOnState() {
     // Don't just flip/flop any time temperature is below threshold.
     // Instead:
     //  if currently off and we are colder than (threshold - swing), turn on
@@ -285,8 +296,9 @@ u_int8_t SensorBasedControl::getEffectiveValueForDependents() {
     //  if within threshold+/- swing, stay where you are
 
     // Delta to where we want to be, positive is too hot, negative is too cold:
-    float delta = temperatureUtils->getTempF(this->sensorIndex) - (float)getEffectiveValue();
-    if (getEffectiveValue() == max && delta >= 0) {
+    u_int8_t effectiveValue = getEffectiveValue();
+    float delta = temperatureUtils->getTempF(this->sensorIndex) - (float)effectiveValue;
+    if (effectiveValue == max && delta >= 0) {
         // We must never exceed max, this is a safety feature.
         // An appliance may not be capable of going any higher and will be stuck ON forever
         // Do not apply deadband logic in this case.
@@ -300,9 +312,28 @@ u_int8_t SensorBasedControl::getEffectiveValueForDependents() {
     }
     return slowFlipState ? 1 : 0;
 }
+/**
+ * Implements postShutdownStayOn logic to extract heat from heater by keeping pump on
+ * @return same as getOnState unless postShutdown delay is in effect
+ */
+u_int8_t SensorBasedControl::getOnStateForDependents() {
+    getOnState();
+
+    if (slowFlipState == 1) {
+        // save the stay-on-until time
+        postShutdownStayOnUntil = now() + postShutdownOnTime;
+    } else {
+        // apply post shutdown delay
+        if (now() < postShutdownStayOnUntil) {
+            return 1;
+        }
+    }
+    return slowFlipState ? 1 : 0;
+}
 
 void SensorBasedControl::applyOutputs() {
-    digitalWrite(pin, getEffectiveValueForDependents());
+//    Serial.printf("Applying outputs for %s", name);
+    digitalWrite(pin, getOnState());
 }
 
 
@@ -322,7 +353,8 @@ void SpaStatus::updateStatusString() {
         control->jsonStatus["DO"] = control->normalSettings.overrideDefaultDurationSeconds;
         control->jsonStatus["type"] = control->type;
         control->jsonStatus["ORT"] = control->getOverrideScheduleRemainingTime();
-        control->jsonStatus["eval"] = control->getEffectiveValueForDependents();
+        control->jsonStatus["val_o"] = control->getOnState();
+        control->jsonStatus["val_d"] = control->getOnStateForDependents();
         if (control->getDependentControl() != NULL) {
             control->jsonStatus["depctl"] = control->getDependentControl()->name;
         }

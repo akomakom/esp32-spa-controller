@@ -407,10 +407,10 @@
             scheduler.toggle(controlData['ORT'] > 0);
 
             // 250+ is special
-            let isOn = controlData['eval'] > 0;
+            let isOn = controlData['val_o'] > 0;
+            control.find('.control-is-dep-on').toggle(!isOn && controlData['val_d'] > 0);
             control.find('.control-is-on').toggle(isOn);
             control.find('.control-is-off').toggle(!isOn);
-
           });
 
         });
@@ -425,7 +425,7 @@
   </script>
 </head>
 <body>
-<div id="spastatus">
+<div id="spastatus">C
   <div class="metric-widget" id="water">
     <div class="title">Water</div>
     <div class="data">
@@ -456,6 +456,7 @@
   <div class="spacontrol">
     <div class="control-name"></div>
     <div class="top-right-icons">
+      <span class="control-power-state control-is-dep-on" title="Currently telling dependent controls to be ON">&#128993;</span>
       <span class="control-power-state control-is-on" title="Currently ON">&#x1F534;</span>
       <span class="control-power-state control-is-off" title="Currently OFF">&#x26AA;</span>
       <span class="control-dependent" title="Depends on another control">&#x2942;</span>

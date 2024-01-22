@@ -210,7 +210,8 @@ public:
     virtual void toggle();
 
     /**
-     *
+     *  This is the input value, eg on/off (1/0) or "100" for temperature.
+     *  It can vary by scheduler/override
      * @return either this->value or this->scheduler value if scheduler is in effect
      */
     virtual u_int8_t getEffectiveValue();
@@ -218,9 +219,16 @@ public:
     /**
      * For some cotrols (eg SensorBased), effective value doesn't translate to
      * "is on" very easily
-     * @return a consistent value, same as getEffectiveValue for simple controls
+     * @return The output state that is actually driving output pins.
+     *      Same as getEffectiveValue() for simple control, on/off for SensorBased
      */
-    virtual u_int8_t getEffectiveValueForDependents();
+    virtual u_int8_t getOnState();
+
+    /**
+     * @return Usually same as getOnState() but may differ
+     *  if delays are implemented (eg post delay for heater)
+     */
+    virtual u_int8_t getOnStateForDependents();
 
     virtual void applyOutputs();
 
@@ -269,17 +277,22 @@ public:
 
 class SensorBasedControl: public SpaControl {
 public:
-    SensorBasedControl(const char *name, u_int8_t pin, u_int8_t sensorIndex, u_int8_t swing, TemperatureUtils* temps);
+    SensorBasedControl(const char *name, u_int8_t pin, u_int8_t sensorIndex, u_int8_t swing, time_t postShutdownStayOnUntil, TemperatureUtils* temps);
     virtual void applyOutputs();
-    virtual u_int8_t getEffectiveValueForDependents();
+    virtual u_int8_t getOnState();
+    virtual u_int8_t getOnStateForDependents();
 
     u_int8_t pin;
     u_int8_t sensorIndex;
 
-    float swing; // +/- threshold before kicking on
+    float swing; // +/- threshold before kicking on/off
+    // The length of time to keep downstream controls on (eg pump) after shutdown
+    // for example to extract heat from the heater
+    time_t postShutdownOnTime = 0;
 
     TemperatureUtils* temperatureUtils;
 private:
+    time_t postShutdownStayOnUntil = 0; // we'll save a future time in here
     bool slowFlipState = false; // for swing feature
 
 };
@@ -297,7 +310,7 @@ public:
     TemperatureUtils temperatureUtils;
     SpaControl* pump = new TwoSpeedSpaControl("pump", RELAY_PIN_1, RELAY_PIN_2);
     SpaControl* blower = new SimpleSpaControl("blower", RELAY_PIN_3);
-    SpaControl* heater = new SensorBasedControl("heater", RELAY_PIN_4, 0, 1, &temperatureUtils);
+    SpaControl* heater = new SensorBasedControl("heater", RELAY_PIN_4, 0, 1, 5*60, &temperatureUtils);
     SpaControl* ozone = new SimpleSpaControl("ozone", RELAY_PIN_5);
     SpaControl* light = new SimpleSpaControl("light", RELAY_PIN_6);
 
