@@ -156,6 +156,13 @@ time_t SpaControlScheduler::getOverrideScheduleRemainingTime() {
     return 0;
 }
 
+time_t SpaControlScheduler::getOverrideScheduleElapsedTime() {
+    if (overrideStartTime <= now()) {
+        return std::min((time_t)(overrideEndTime - overrideStartTime), now() - overrideStartTime);
+    }
+    return 0;
+}
+
 
 void SpaControlScheduler::updateConfigJsonString() {
     jsonConfig["percentageOfDayOnTime"] = normalSettings.percentageOfDayOnTime;

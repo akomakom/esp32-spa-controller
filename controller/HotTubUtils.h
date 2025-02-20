@@ -160,6 +160,11 @@ public:
     time_t getOverrideScheduleRemainingTime();
 
     /**
+     *
+     * @return seconds since override began or 0 if not in override mode
+     */
+    time_t getOverrideScheduleElapsedTime();
+    /**
      * @return If override is enabled, returns overrideValue
      */
     u_int8_t getOverrideValue();

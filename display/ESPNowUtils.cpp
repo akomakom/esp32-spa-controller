@@ -64,28 +64,24 @@ void ESPNowUtils::OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t stat
 
 
 void ESPNowUtils::OnDataRecv(const uint8_t * mac_addr, const uint8_t *incomingData, int len) {
-    Serial.print("Packet received from: ");
-    printMAC(mac_addr);
-    Serial.println();
-    Serial.print("data size = ");
-    Serial.println(sizeof(incomingData));
+//    Serial.print("Packet received from: ");
+//    printMAC(mac_addr);
+//    Serial.printf("data size = %d", sizeof(incomingData));
     uint8_t type = incomingData[0];
     lastMessageReceivedTime = millis();
     switch (type) {
         case CONTROL_STATUS :      // we received data from server
             memcpy(&receivedControlStatus, incomingData, sizeof(receivedControlStatus));
-            Serial.print("ID  = ");
-            Serial.print(receivedControlStatus.board_id);
-            Serial.print(" control = ");
-            Serial.print(receivedControlStatus.control_id);
-            Serial.print(" value = ");
-            Serial.println(receivedControlStatus.value);
+//            Serial.printf(" ID  = %d, Control = %d, Value = %d\n",
+//              receivedControlStatus.board_id,
+//              receivedControlStatus.control_id,
+//              receivedControlStatus.value);
             dataCallbackControl(&receivedControlStatus);
             break;
         case SERVER_STATUS:
             memcpy(&receivedServerStatus, incomingData, sizeof(receivedServerStatus));
-            Serial.print("Received server status from ");
-            Serial.println(receivedServerStatus.server_name);
+//            Serial.print("Received server status from ");
+//            Serial.println(receivedServerStatus.server_name);
             dataCallbackServer(&receivedServerStatus);
             break;
         case PAIRING:    // we received pairing data from server

@@ -44,6 +44,7 @@ typedef struct struct_status_control {
     char name[15] = "";
     u_int32_t DO;   // Default override time
     u_int32_t ORT;  // override remaining time
+    u_int32_t EL;  // override elapsed time
     u_int8_t value;
     u_int8_t e_value;
 } struct_status_control;

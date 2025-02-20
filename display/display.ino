@@ -33,6 +33,9 @@ lv_style_t style;
 lv_style_t styleNoPadding;
 lv_style_t stylePadding;
 lv_style_t styleHugeFont;
+lv_style_t styleArcMain;
+lv_style_t styleArcIndicator;
+lv_style_t styleArcKnob;
 
 lv_obj_t * statusLabel = NULL;
 lv_obj_t * bannerLabel = NULL;
@@ -132,6 +135,19 @@ void initUI() {
 
     lv_style_init(&styleHugeFont);
     lv_style_set_text_font(&styleHugeFont, &lv_font_montserrat_40);
+
+
+    lv_style_init(&styleArcIndicator);
+    lv_style_set_arc_width(&styleArcIndicator,3);
+    lv_style_set_arc_color(&styleArcIndicator,lv_color_hex(0xC71585));
+    
+    lv_style_init(&styleArcMain);
+    lv_style_set_arc_width(&styleArcMain,3);
+
+    lv_style_init(&styleArcKnob);
+    lv_style_set_arc_width(&styleArcKnob,3); // does nothing
+    lv_style_set_bg_opa(&styleArcKnob, 30);
+    lv_style_set_bg_color(&styleArcKnob,lv_color_hex(0xFF4500));
 
     TRACE("UI 1");
 
@@ -366,14 +382,14 @@ void dataReceivedServerStatus(struct_status_server *status) {
     // set time from server
     setTime(status->time + status->tz_offset);
     gfx_set_screen_timeout(status->touchscreen_timeout * 1000);
-    TRACE("Set Time");
+//    TRACE("Set Time");
 //    Serial.printf("Received touchscreen timeout %d, last touch time %d, millis %d, remaining time %d, bright %d", status->touchscreen_timeout, last_gfx_touch_time, millis(), (last_gfx_touch_time + gfx_screen_timeout) - millis(), displayBrightness);
 
     if (bannerLabel != NULL && timeLabel != NULL) { // already initialized
         lv_label_set_text_fmt(bannerLabel, "%s @%.1fF ", status->server_name, status->water_temp);
-        TRACE("Updated server status label 1");
+//        TRACE("Updated server status label 1");
     }
-    TRACE("Updated server status labels");
+//    TRACE("Updated server status labels");
 }
 
 void dataReceivedControlStatus(struct_status_control *status) {
@@ -403,7 +419,7 @@ void dataReceivedControlStatus(struct_status_control *status) {
         memcpy(controlStatuses[status->control_id], status, sizeof(struct_status_control));
         //        controlButtons[status->control_id]
 //        showStatusMessage("Updating copy of status, max orig %d new %d", status->max, controlStatuses[status->control_id]->max);
-        TRACE("Control Status 4");
+//        TRACE("Control Status 4");
     }
 
 }
@@ -437,11 +453,13 @@ void updateButtons(lv_timer_t * timer) {
                 lv_obj_t *led = lv_led_create(btn);
                 lv_obj_set_size(led, 10, 10);
 //                lv_obj_add_style(btn, &stylePaddingTwo, 0);
-                lv_obj_set_style_pad_all(btn, 6, LV_PART_MAIN);
-                lv_obj_align(led, LV_ALIGN_TOP_RIGHT, 0, 0);
+//                lv_obj_set_style_pad_all(btn, 6, LV_PART_MAIN);
+                lv_obj_align(led, LV_ALIGN_TOP_RIGHT, 6, 6);
                 lv_led_set_brightness(led, 150);
                 lv_led_set_color(led, lv_palette_main(LV_PALETTE_RED));
                 lv_led_off(led);
+                // NOTE: not helpful, hiding
+                lv_obj_add_flag(led, LV_OBJ_FLAG_HIDDEN);
 
                 lv_obj_t *label = lv_label_create(btn);
                 lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 0);
@@ -450,6 +468,20 @@ void updateButtons(lv_timer_t * timer) {
                 //TRACE("Update Buttons 2.5");
                 lv_obj_center(label);
 //                TRACE("Update Buttons 3");
+
+                lv_obj_t * arc = lv_arc_create(btn);
+                lv_obj_set_size(arc, 41, 41);
+                lv_arc_set_rotation(arc, 135);
+                lv_arc_set_bg_angles(arc, 0, 270);
+                lv_arc_set_value(arc, 1);
+//                lv_arc_set_mode(arc, LV_ARC_MODE_REVERSE);
+                lv_obj_set_style_pad_all(arc, 0, LV_PART_MAIN);
+                lv_obj_add_style(arc, &styleArcIndicator, LV_PART_INDICATOR);
+                lv_obj_add_style(arc, &styleArcMain, LV_PART_MAIN);
+                lv_obj_add_style(arc, &styleArcKnob, LV_PART_KNOB);
+
+//                lv_obj_center(arc);
+                lv_obj_align(led, LV_ALIGN_LEFT_MID, 0, 0);
 
                 controlButtons.push_back(singleControlContainer);
             }
@@ -469,6 +501,14 @@ void updateButtons(lv_timer_t * timer) {
         // 2nd child
         lv_obj_t * label = lv_obj_get_child(btn, 1);
 //        TRACE("Update Buttons 5.1");
+        lv_obj_t * arc  = lv_obj_get_child(btn, 2);
+
+        if (status->ORT > 0) {
+          lv_arc_set_value(arc, 100 *  status->EL / (status->ORT + status->EL));
+          lv_obj_clear_flag(arc, LV_OBJ_FLAG_HIDDEN);
+        } else {
+          lv_obj_add_flag(arc, LV_OBJ_FLAG_HIDDEN);
+        }
 
         if (status->e_value) {
             lv_led_on(led);

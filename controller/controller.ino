@@ -271,6 +271,8 @@ void sendStatus() {
             strcpy(ESPNowUtils::outgoingStatusControl.name, control->name);
             ESPNowUtils::outgoingStatusControl.ORT = control->getOverrideScheduleRemainingTime();
             ESPNowUtils::outgoingStatusControl.DO = control->normalSettings.overrideDefaultDurationSeconds;
+            ESPNowUtils::outgoingStatusControl.EL = control->getOverrideScheduleElapsedTime();
+
             ESPNowUtils::outgoingStatusControl.value = control->getEffectiveValue();
             ESPNowUtils::outgoingStatusControl.e_value = control->getOnState();
 
