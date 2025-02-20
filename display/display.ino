@@ -416,7 +416,7 @@ void updateButtons(lv_timer_t * timer) {
                 // add this control
                 lv_obj_t *singleControlContainer = lv_obj_create(controlButtonContainer);
                 lv_obj_set_user_data(singleControlContainer, controlStatuses[i]);
-                //TRACE("Update Buttons 2.01");
+//                TRACE("Update Buttons 2.01");
                 lv_obj_add_style(singleControlContainer, &style, 0);
                 //TRACE("Update Buttons 2.02");
                 lv_obj_add_style(singleControlContainer, &styleNoPadding, 0);
@@ -426,15 +426,18 @@ void updateButtons(lv_timer_t * timer) {
 
                 lv_obj_t *btn = lv_btn_create(singleControlContainer);
                 //TRACE("Update Buttons 2.1");
-                lv_obj_set_size(btn, 200, 64);
+                lv_obj_set_size(btn, 220, 68);
                 lv_obj_align(btn, LV_ALIGN_BOTTOM_MID, 0, 0);
                 //TRACE("Update Buttons 2.2");
                 lv_obj_add_event_cb(btn, btn_event_cb, LV_EVENT_CLICKED,
                                     controlStatuses[i]);
-                //TRACE("Update Buttons 2.3");
+                lv_obj_set_style_border_width(btn, 3, LV_PART_MAIN | LV_STATE_DEFAULT);
+//                TRACE("Update Buttons 2.3");
 
-                lv_obj_t *led = lv_led_create(singleControlContainer);
-                lv_obj_set_size(led, 15, 15);
+                lv_obj_t *led = lv_led_create(btn);
+                lv_obj_set_size(led, 10, 10);
+//                lv_obj_add_style(btn, &stylePaddingTwo, 0);
+                lv_obj_set_style_pad_all(btn, 6, LV_PART_MAIN);
                 lv_obj_align(led, LV_ALIGN_TOP_RIGHT, 0, 0);
                 lv_led_set_brightness(led, 150);
                 lv_led_set_color(led, lv_palette_main(LV_PALETTE_RED));
@@ -446,7 +449,7 @@ void updateButtons(lv_timer_t * timer) {
                 lv_label_set_text_fmt(label, "%s", controlStatuses[i]->name);
                 //TRACE("Update Buttons 2.5");
                 lv_obj_center(label);
-                //TRACE("Update Buttons 3");
+//                TRACE("Update Buttons 3");
 
                 controlButtons.push_back(singleControlContainer);
             }
@@ -460,33 +463,36 @@ void updateButtons(lv_timer_t * timer) {
 
         // 1st child
         lv_obj_t * btn = lv_obj_get_child(controlButton, 0);
+        //TRACE("Update Buttons 5.3");
+        // 1 child (label is second)
+        lv_obj_t * led = lv_obj_get_child(btn, 0);
         // 2nd child
-        lv_obj_t * led = lv_obj_get_child(controlButton, 1);
-        //TRACE("Update Buttons 5.1");
+        lv_obj_t * label = lv_obj_get_child(btn, 1);
+//        TRACE("Update Buttons 5.1");
 
         if (status->e_value) {
             lv_led_on(led);
+            lv_obj_set_style_border_color(btn, lv_palette_main(LV_PALETTE_RED), LV_PART_MAIN | LV_STATE_DEFAULT);
         } else {
             lv_led_off(led);
+            lv_obj_set_style_border_color(btn, lv_palette_main(LV_PALETTE_BLUE), LV_PART_MAIN | LV_STATE_DEFAULT);
         }
         //TRACE("Update Buttons 5.2");
 
-        // 2nd child
-        lv_obj_t * label = lv_obj_get_child(btn, 0);
-        //TRACE("Update Buttons 5.3");
 
         if (strcmp(status->type, "off-low-high") == 0 && status->e_value > 0) {
-            //TRACE("Update Buttons 5.4");
+//            TRACE("Update Buttons 5.4");
             lv_label_set_text_fmt(label, "%s (%s)", status->name, status->e_value == 1 ? "LOW" : "HIGH");
-            //TRACE("Update Buttons 5.5");
+//            TRACE("Update Buttons 5.5");
             lv_led_set_color(led, lv_palette_main(status->e_value == 1 ? LV_PALETTE_RED : LV_PALETTE_YELLOW));
+            lv_obj_set_style_border_color(btn, lv_palette_main(status->e_value == 1 ? LV_PALETTE_RED : LV_PALETTE_ORANGE), LV_PART_MAIN | LV_STATE_DEFAULT);
         } else if (strcmp(status->type, "sensor-based") == 0) {
             lv_label_set_text_fmt(label, "%s (%d)", status->name, status->value);
         } else {
             lv_label_set_text(label, status->name);
         }
     }
-    //TRACE("Update Buttons 6");
+//    TRACE("Update Buttons 6");
 
 }
 

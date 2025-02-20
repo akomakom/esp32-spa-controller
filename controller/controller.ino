@@ -10,7 +10,7 @@
 #include "ESPNowUtils.h"
 
 // Interval at which to publish sensor readings
-#define ESP_STATUS_SEND_INTERVAL  10000
+#define ESP_STATUS_SEND_INTERVAL  1000
 
 #define NTP_SYNC_INTERVAL 3600 * 1000
 // If we don't get NTP sync success for this long, reboot (assume that network failed)
