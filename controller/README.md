@@ -20,6 +20,8 @@ Any ESP32 with enough pins to drive relays should work.  A pre-integrated dev bo
 One-time step: Use Arduino IDE to upload SPIFFS to initialize the partition:
 `Tools->ESP32 Sketch Data Upload`  (You'll need the ESP32 additional boards installed)
 
+If you do not see that menu item, install https://github.com/me-no-dev/arduino-esp32fs-plugin
+
 ### Web Development for the UI
 
 `make upload-spiffs-via-http-inotifywait`  

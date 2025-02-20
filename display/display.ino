@@ -22,6 +22,7 @@ lv_obj_t * mainScreen = NULL;
 int8_t sensorBasedControlPanelIncrement = 1;
 int8_t sensorBasedControlPanelDecrement = -1;
 int8_t sensorBasedControlPanelReset = 0;
+int8_t sensorBasedControlPanelClose = 2;
 
 lv_obj_t * sensorBasedControlPanel = NULL;
 lv_obj_t * sensorBasedControlSetpointLabel = NULL;
@@ -281,20 +282,34 @@ void createSensorBasedDialog() {
     //lv_obj_set_style_text_align(btnLabel, LV_TEXT_ALIGN_CENTER, 0);
 
 
+
     TRACE("mbox 6");
-    // Reset Button
+    // Revert Button
     btn = lv_btn_create(sensorBasedControlPanel);
     lv_obj_set_size(btn, h, h);
 //    lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_CLOSE, 0);
     lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_CLICKED, &sensorBasedControlPanelReset);
-    lv_obj_set_grid_cell(btn, LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
+    lv_obj_set_grid_cell(btn, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
 
     btnLabel = lv_label_create(btn);
-    lv_label_set_text(btnLabel, "Cancel");
+    lv_label_set_text(btnLabel, "Revert");
     //lv_obj_set_style_text_align(btnLabel, LV_TEXT_ALIGN_CENTER, 0);
 
 
     TRACE("mbox 7");
+    // Reset Button
+    btn = lv_btn_create(sensorBasedControlPanel);
+    lv_obj_set_size(btn, h, h);
+//    lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_CLOSE, 0);
+    lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_CLICKED, &sensorBasedControlPanelClose);
+    lv_obj_set_grid_cell(btn, LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
+
+    btnLabel = lv_label_create(btn);
+    lv_label_set_text(btnLabel, "Close");
+    //lv_obj_set_style_text_align(btnLabel, LV_TEXT_ALIGN_CENTER, 0);
+
+
+    TRACE("mbox 8");
 }
 
 void setup()
@@ -404,14 +419,14 @@ void updateButtons(lv_timer_t * timer) {
                 //TRACE("Update Buttons 2.01");
                 lv_obj_add_style(singleControlContainer, &style, 0);
                 //TRACE("Update Buttons 2.02");
-                lv_obj_add_style(singleControlContainer, &stylePadding, 0);
+                lv_obj_add_style(singleControlContainer, &styleNoPadding, 0);
                 //TRACE("Update Buttons 2.03");
                 lv_obj_set_size(singleControlContainer, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
                 //TRACE("Update Buttons 2.04");
 
                 lv_obj_t *btn = lv_btn_create(singleControlContainer);
                 //TRACE("Update Buttons 2.1");
-                lv_obj_set_size(btn, 140, 60);
+                lv_obj_set_size(btn, 200, 64);
                 lv_obj_align(btn, LV_ALIGN_BOTTOM_MID, 0, 0);
                 //TRACE("Update Buttons 2.2");
                 lv_obj_add_event_cb(btn, btn_event_cb, LV_EVENT_CLICKED,

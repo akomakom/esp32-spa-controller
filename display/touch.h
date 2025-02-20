@@ -42,10 +42,10 @@
 // 500-4500 => 81-455
 // 500-5000 => 116 - 460
 // 0 - 5000 => 105 - 410
- #define TOUCH_MAP_X1 3950
- #define TOUCH_MAP_X2 700
- #define TOUCH_MAP_Y1 700
- #define TOUCH_MAP_Y2 3950
+ #define TOUCH_MAP_X1 3800
+ #define TOUCH_MAP_X2 300
+ #define TOUCH_MAP_Y1 300
+ #define TOUCH_MAP_Y2 3750
 
 int touch_last_x = 0, touch_last_y = 0;
 
