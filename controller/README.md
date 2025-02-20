@@ -7,7 +7,7 @@ Any ESP32 with enough pins to drive relays should work.  A pre-integrated dev bo
 ### Software Installation 
 #### Libraries
 
-* Arduino_JSON
+* Arduino_JSON (Benoit Blanchon)
 * OneWire
 * DallasTemperature
 

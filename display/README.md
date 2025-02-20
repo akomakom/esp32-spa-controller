@@ -20,9 +20,11 @@ To configure for different hardware, edit `gfx.h` and `touch.h`
 
 These can be installed using Arduino IDE.
 
+* ESP32 Boards (Tested with 2.x, currently doesn't work with 3.x+)
 * LVGL (tested with version 8.3).  See setup steps below.
 * Arduino_GFX_Library
 * XPT2046_Touchscreen (or your touchscreen's driver)
+* Time https://github.com/PaulStoffregen/Time
 
 
 #### LVGL Setup
