@@ -20,9 +20,9 @@ To configure for different hardware, edit `gfx.h` and `touch.h`
 
 These can be installed using Arduino IDE.
 
-* ESP32 Boards (Tested with 2.x, currently doesn't work with 3.x+)
-* LVGL (tested with version 8.3.0-dev, which is some commit before 8.3.0 and doesn't have lv_draw_layer.h).  See setup steps below.
-* Arduino_GFX_Library (version 1.2.8)
+* ESP32 Boards (3.x)
+* LVGL (8.4.0).  See setup steps below.
+* Arduino_GFX_Library (version 1.5.0)
 * XPT2046_Touchscreen (or your touchscreen's driver)
 * Time https://github.com/PaulStoffregen/Time
 
@@ -34,10 +34,9 @@ LVGL needs to be configured at the system level as follows
 **Note** you should repeat this step every time you upgrade `lvgl`, as the defaults vary between versions.
 
 1. Copy `~/Arduino/libraries/lvgl/lv_conf_template.h` to `~/Arduino/libraries/lv_conf.h` (not a typo, copied to libraries dir)
-   Note: actually built by copying the
 2. Edit as follows:
 3. Change "if 0" at the top to "if 1"
-4. You may need to experiment with `LV_MEM_CUSTOM`.  The following settings work for `LV_MEM_CUSTOM 0` if you need it.
+4. You may need to experiment with `LV_MEM_CUSTOM` (or not).  The following settings work for `LV_MEM_CUSTOM 0` if you need it.
    ```c++
    #define LV_MEM_SIZE (96U * 1024U)
    #define LV_MEM_POOL_INCLUDE <esp32-hal-psram.h>
