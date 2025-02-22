@@ -53,7 +53,7 @@ void ESPNowUtils::registerEspCommStatusCallBackHandler(ESPNowUtils::esp_comm_sta
 }
 
 // callback when data is sent
-void ESPNowUtils::OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+void ESPNowUtils::OnDataSent(  const uint8_t *mac_addr, esp_now_send_status_t status) {
     Serial.print("\r\nLast Packet Send Status:\t");
     lastMessageSentTime = millis();
     Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
@@ -63,7 +63,9 @@ void ESPNowUtils::OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t stat
 }
 
 
-void ESPNowUtils::OnDataRecv(const uint8_t * mac_addr, const uint8_t *incomingData, int len) {
+void ESPNowUtils::OnDataRecv(const esp_now_recv_info* info, const uint8_t *incomingData, int len) {
+
+    uint8_t * mac_addr = info->src_addr;
 //    Serial.print("Packet received from: ");
 //    printMAC(mac_addr);
 //    Serial.printf("data size = %d", sizeof(incomingData));

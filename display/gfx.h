@@ -43,20 +43,18 @@ Arduino_GFX *gfx = create_default_Arduino_GFX();
 /* More display class: https://github.com/moononournation/Arduino_GFX/wiki/Display-Class */
 //Arduino_GFX *gfx = new Arduino_ILI9341(bus, DF_GFX_RST, 0 /* rotation */, false /* IPS */);
 
-Arduino_ESP32RGBPanel *bus = new Arduino_ESP32RGBPanel(
-    GFX_NOT_DEFINED /* CS */, GFX_NOT_DEFINED /* SCK */, GFX_NOT_DEFINED /* SDA */,
-    40 /* DE */, 41 /* VSYNC */, 39 /* HSYNC */, 42 /* PCLK */,
-    45 /* R0 */, 48 /* R1 */, 47 /* R2 */, 21 /* R3 */, 14 /* R4 */,
-    5 /* G0 */, 6 /* G1 */, 7 /* G2 */, 15 /* G3 */, 16 /* G4 */, 4 /* G5 */,
-    8 /* B0 */, 3 /* B1 */, 46 /* B2 */, 9 /* B3 */, 1 /* B4 */
-);
-// option 1:
-// ILI6485 LCD 480x272
-Arduino_RPi_DPI_RGBPanel *gfx = new Arduino_RPi_DPI_RGBPanel(
-  bus,
-  480 /* width */, 0 /* hsync_polarity */, 8 /* hsync_front_porch */, 4 /* hsync_pulse_width */, 43 /* hsync_back_porch */,
-  272 /* height */, 0 /* vsync_polarity */, 8 /* vsync_front_porch */, 4 /* vsync_pulse_width */, 12 /* vsync_back_porch */,
-  1 /* pclk_active_neg */, 9000000 /* prefer_speed */, true /* auto_flush */);
+
+Arduino_ESP32RGBPanel *rgbpanel = new Arduino_ESP32RGBPanel(
+40 /* DE */, 41 /* VSYNC */, 39 /* HSYNC */, 42 /* PCLK */,
+45 /* R0 */, 48 /* R1 */, 47 /* R2 */, 21 /* R3 */, 14 /* R4 */,
+5 /* G0 */, 6 /* G1 */, 7 /* G2 */, 15 /* G3 */, 16 /* G4 */, 4 /* G5 */,
+8 /* B0 */, 3 /* B1 */, 46 /* B2 */, 9 /* B3 */, 1 /* B4 */,
+0 /* hsync_polarity */, 1 /* hsync_front_porch */, 1 /* hsync_pulse_width */, 43 /* hsync_back_porch */,
+0 /* vsync_polarity */, 3 /* vsync_front_porch */, 1 /* vsync_pulse_width */, 12 /* vsync_back_porch */,
+1 /* pclk_active_neg */, 8000000 /* prefer_speed */);
+
+Arduino_RGB_Display *gfx = new Arduino_RGB_Display(
+480 /* width */, 272 /* height */, rgbpanel, 0 /* rotation */, false /* auto_flush */);
 
 // option 2:
 // ST7262 IPS LCD 800x480
@@ -124,7 +122,7 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
             last_gfx_touch_time = millis(); // wake up regardless
             if (gfx_ignore_touch_until > millis()) {
                 Serial.printf("Ignoring touch for another %d millis", (gfx_ignore_touch_until - millis()));
-                return;
+//                return;
             }
 
             data->state = LV_INDEV_STATE_PR;
@@ -149,14 +147,15 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 void gfx_loop() {
     // dim the screen after half the screen timeout
     long remaining_millis = gfx_screen_timeout_remaining_millis();
-    if (remaining_millis > (long)(gfx_screen_timeout / 2)) {
-        displayBrightness = BRIGHTNESS_FULL;
-    } else if (remaining_millis > 0) {
-        displayBrightness = BRIGHTNESS_DIM;
-    } else {
-        displayBrightness = BRIGHTNESS_OFF;
-    }
-    analogWrite(TFT_BL, displayBrightness);
+    //TODO: timeout may be broken with new versions, works without this:
+//    if (remaining_millis > (long)(gfx_screen_timeout / 2)) {
+//        displayBrightness = BRIGHTNESS_FULL;
+//    } else if (remaining_millis > 0) {
+//        displayBrightness = BRIGHTNESS_DIM;
+//    } else {
+//        displayBrightness = BRIGHTNESS_OFF;
+//    }
+//    analogWrite(TFT_BL, displayBrightness);
 }
 
 void gfx_set_screen_timeout(unsigned long timeout) {

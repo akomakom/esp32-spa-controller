@@ -337,8 +337,15 @@ void setup()
     delay(500);
     // while (!Serial);
     Serial.println("Hot Tub Display Init");
-    esp_task_wdt_init(10, true);  // Enable WDT with 10s timeout
-    esp_task_wdt_add(NULL);        // Apply to the current task
+
+    esp_task_wdt_config_t twdt_config = {
+        .timeout_ms = 200,
+        .idle_core_mask = (1 << CONFIG_FREERTOS_NUMBER_OF_CORES) - 1,    // Bitmask of all cores
+        .trigger_panic = false,
+    };
+//    ESP_ERROR_CHECK(esp_task_wdt_init(&twdt_config));
+    esp_task_wdt_init(&twdt_config);
+    ESP_ERROR_CHECK(esp_task_wdt_add(NULL)); // Apply to the current task
 
     showStatusMessage("Total heap: %d", ESP.getHeapSize());
     showStatusMessage("Free heap: %d", ESP.getFreeHeap());

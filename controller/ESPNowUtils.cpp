@@ -63,7 +63,8 @@ void ESPNowUtils::OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t stat
     Serial.println();
 }
 
-void ESPNowUtils::OnDataRecv(const uint8_t * mac_addr, const uint8_t *incomingData, int len) {
+void ESPNowUtils::OnDataRecv(const esp_now_recv_info* info, const uint8_t *incomingData, int len) {
+    uint8_t * mac_addr = info->src_addr;
     Serial.print(len);
     Serial.print(" bytes of data received from : ");
     printMAC(mac_addr);
