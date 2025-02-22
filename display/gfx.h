@@ -122,7 +122,7 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
             last_gfx_touch_time = millis(); // wake up regardless
             if (gfx_ignore_touch_until > millis()) {
                 Serial.printf("Ignoring touch for another %d millis", (gfx_ignore_touch_until - millis()));
-//                return;
+                return;
             }
 
             data->state = LV_INDEV_STATE_PR;
@@ -147,15 +147,14 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 void gfx_loop() {
     // dim the screen after half the screen timeout
     long remaining_millis = gfx_screen_timeout_remaining_millis();
-    //TODO: timeout may be broken with new versions, works without this:
-//    if (remaining_millis > (long)(gfx_screen_timeout / 2)) {
-//        displayBrightness = BRIGHTNESS_FULL;
-//    } else if (remaining_millis > 0) {
-//        displayBrightness = BRIGHTNESS_DIM;
-//    } else {
-//        displayBrightness = BRIGHTNESS_OFF;
-//    }
-//    analogWrite(TFT_BL, displayBrightness);
+    if (remaining_millis > (long)(gfx_screen_timeout / 2)) {
+        displayBrightness = BRIGHTNESS_FULL;
+    } else if (remaining_millis > 0) {
+        displayBrightness = BRIGHTNESS_DIM;
+    } else {
+        displayBrightness = BRIGHTNESS_OFF;
+    }
+    analogWrite(TFT_BL, displayBrightness);
 }
 
 void gfx_set_screen_timeout(unsigned long timeout) {
