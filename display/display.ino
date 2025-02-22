@@ -1,5 +1,8 @@
 #define GRAPHICS_ENABLE
 
+// debug:
+#include "esp_task_wdt.h"
+
 /*******************************************************************************
  * Please configure graphics in gfx.h
  ******************************************************************************/
@@ -334,6 +337,8 @@ void setup()
     delay(500);
     // while (!Serial);
     Serial.println("Hot Tub Display Init");
+    esp_task_wdt_init(10, true);  // Enable WDT with 10s timeout
+    esp_task_wdt_add(NULL);        // Apply to the current task
 
     showStatusMessage("Total heap: %d", ESP.getHeapSize());
     showStatusMessage("Free heap: %d", ESP.getFreeHeap());
@@ -359,12 +364,26 @@ void setup()
 
 void loop()
 {
+  static unsigned int debug_if_zero = 0;
+  esp_task_wdt_reset();  // Keep resetting the watchdog
+
 #ifdef GRAPHICS_ENABLE
+    if (debug_if_zero == 0) Serial.print("L1");
     lv_timer_handler(); /* let the GUI do its work */
 #endif
+    if (debug_if_zero == 0) Serial.print("L2");
     ESPNowUtils::loop();
+    if (debug_if_zero == 0) Serial.print("L3");
     gfx_loop();
+    if (debug_if_zero == 0) Serial.print("L4");
     delay(5);
+
+    if (debug_if_zero == 0) {
+      Serial.printf("Free Heap: %d b, up %d\n", ESP.getFreeHeap(), millis() / 1000);
+    }
+
+  debug_if_zero++;
+  if (debug_if_zero > 5000) debug_if_zero = 0;
 }
 
 void updateStatusBar(lv_timer_t * timer) {
