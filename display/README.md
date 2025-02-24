@@ -18,12 +18,12 @@ To configure for different hardware, edit `gfx.h` and `touch.h`
 
 #### Libraries Required
 
-These can be installed using Arduino IDE.
+These can be installed using Arduino IDE.  Tested with versions listed.
 
-* ESP32 Boards (3.x)
+* ESP32 Boards (3.1.3)
 * LVGL (8.4.0).  See setup steps below.
 * Arduino_GFX_Library (version 1.5.0)
-* XPT2046_Touchscreen (or your touchscreen's driver)
+* XPT2046_Touchscreen (1.4.0) https://github.com/PaulStoffregen/XPT2046_Touchscreen,  or your touchscreen's driver.
 * Time https://github.com/PaulStoffregen/Time
 
 
@@ -32,6 +32,12 @@ These can be installed using Arduino IDE.
 LVGL needs to be configured at the system level as follows
 
 **Note** you should repeat this step every time you upgrade `lvgl`, as the defaults vary between versions.
+
+##### Option A
+
+**A working lv_conf.h example** for LVGL version mentioned above is included in this directory and can be copied to ~/Arduino/libraries/
+
+##### Option B
 
 1. Copy `~/Arduino/libraries/lvgl/lv_conf_template.h` to `~/Arduino/libraries/lv_conf.h` (not a typo, copied to libraries dir)
 2. Edit as follows:
@@ -59,6 +65,6 @@ Typical usage (once tooling is set up) is:
 ```shell
 # compile, upload, then start serial monitor
 make upload monitor
-make upload monitor PORT=/dev/ttyUSB3 # change port.  
+make upload monitor PORT=/dev/ttyUSB3 # change port from the default in the Makefile.  
 ```
 If building on windows, review Makefiles and perform steps manually.

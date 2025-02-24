@@ -3,6 +3,7 @@
 // debug:
 #include "esp_task_wdt.h"
 
+#include "core.h"
 /*******************************************************************************
  * Please configure graphics in gfx.h
  ******************************************************************************/
@@ -336,7 +337,7 @@ void setup()
     Serial.begin(115200);
     delay(500);
     // while (!Serial);
-    Serial.println("Hot Tub Display Init");
+    Serial.printf("Hot Tub Display Init, reset reason: %s\n", resetReasonName(esp_reset_reason()));
 
     esp_task_wdt_config_t twdt_config = {
         .timeout_ms = 200,
@@ -496,7 +497,7 @@ void updateButtons(lv_timer_t * timer) {
 //                TRACE("Update Buttons 3");
 
                 lv_obj_t * arc = lv_arc_create(btn);
-                lv_obj_set_size(arc, 41, 41);
+                lv_obj_set_size(arc, 35, 35);
                 lv_arc_set_rotation(arc, 135);
                 lv_arc_set_bg_angles(arc, 0, 270);
                 lv_arc_set_value(arc, 1);
