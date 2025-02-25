@@ -20,6 +20,12 @@
 
 const char * MODE_MAPPING[] = { "OFF", "ON", "HIGH" };
 
+
+// Store timestamps to check which task is stuck
+#define WATCHDOG_TIMEOUT 1  // Timeout in seconds
+volatile unsigned long lastTask1Time = 0;
+volatile unsigned long lastTask2Stage = 0;
+
 lv_obj_t * mainScreen = NULL;
 
 // These get passed as pointers to lv events
@@ -36,6 +42,7 @@ u_int8_t   sensorBasedControlSetpointValue = 0;
 lv_style_t style;
 lv_style_t styleNoPadding;
 lv_style_t stylePadding;
+lv_style_t styleSmallFont;
 lv_style_t styleHugeFont;
 lv_style_t styleArcMain;
 lv_style_t styleArcIndicator;
@@ -80,14 +87,19 @@ void showStatusMessage(const char *messageFormat, ...) {
     va_end(args);
 }
 
-void clearStatusMessage(lv_timer_t * timer) {
+void clearStatusMessage(unsigned long frequency) {
+
 #ifdef GRAPHICS_ENABLE
-    if ((statusDisplayTime + STATUS_DISPLAY_TIMEOUT) < millis()) {
+  static unsigned long last_update = 0;
+    if ((millis() - last_update) > frequency) {
+      last_update = millis();
+      if ((statusDisplayTime + STATUS_DISPLAY_TIMEOUT) < millis()) {
         if (statusLabel != NULL) { // already initialized
             lv_label_set_text(statusLabel, "");
         }
 //        Serial.printf("Clearing status message because %d + TIMEOUT < %d\n", statusDisplayTime, millis());
         statusDisplayTime = LONG_MAX; // max long, don't keep clearing it.
+      }
     }
 #endif
 }
@@ -116,7 +128,7 @@ void initUI() {
 //    lv_style_set_pad_row(&style, 10);
 //    lv_style_set_pad_column(&style, 10);
     lv_style_set_text_align(&style, LV_TEXT_ALIGN_CENTER);
-    lv_style_set_text_font(&style, &lv_font_montserrat_20);
+    lv_style_set_text_font(&style, &lv_font_montserrat_24);
 
     lv_style_init(&styleNoPadding);
     lv_style_set_pad_top(&styleNoPadding, 0);
@@ -126,7 +138,7 @@ void initUI() {
     lv_style_set_pad_row(&styleNoPadding, 0);
     lv_style_set_pad_column(&styleNoPadding, 0);
     // requires enabling this font in lv_conf.h
-    lv_style_set_text_font(&styleNoPadding, &lv_font_montserrat_20);
+    lv_style_set_text_font(&styleNoPadding, &lv_font_montserrat_24);
 
 
     lv_style_init(&stylePadding);
@@ -137,9 +149,11 @@ void initUI() {
     lv_style_set_pad_row(&stylePadding, 5);
     lv_style_set_pad_column(&stylePadding, 5);
 
+    lv_style_init(&styleSmallFont);
+    lv_style_set_text_font(&styleSmallFont, &lv_font_montserrat_20);
+
     lv_style_init(&styleHugeFont);
     lv_style_set_text_font(&styleHugeFont, &lv_font_montserrat_40);
-
 
     lv_style_init(&styleArcIndicator);
     lv_style_set_arc_width(&styleArcIndicator,3);
@@ -215,11 +229,17 @@ void initUI() {
 //    lv_obj_center(statusLabel);
     TRACE("UI 6");
 
-    lv_timer_create(updateStatusBar, 100,  NULL);
-    lv_timer_create(updateButtons, 500,  NULL);
-    lv_timer_create(clearStatusMessage, 1000, NULL);
+//    lv_timer_create(updateUI, 500,  NULL);
 
     TRACE("UI 7");
+}
+
+void updateUI(lv_timer_t * timer) {
+
+  updateStatusBar(200);
+  updateButtons(500);
+  clearStatusMessage(1000);
+
 }
 
 void createSensorBasedDialog() {
@@ -340,7 +360,7 @@ void setup()
     Serial.printf("Hot Tub Display Init, reset reason: %s\n", resetReasonName(esp_reset_reason()));
 
     esp_task_wdt_config_t twdt_config = {
-        .timeout_ms = 200,
+        .timeout_ms = 2000,
         .idle_core_mask = (1 << CONFIG_FREERTOS_NUMBER_OF_CORES) - 1,    // Bitmask of all cores
         .trigger_panic = false,
     };
@@ -366,42 +386,85 @@ void setup()
     ESPNowUtils::registerEspCommStatusCallBackHandler((ESPNowUtils::esp_comm_status_callback)showStatusMessage);
     ESPNowUtils::setup();
 
+
+    // custom watchdog
+    xTaskCreate(watchdogMonitorTask, "WDTMonitor", 4096, NULL, 1, NULL);
+
     Serial.println("Setup done");
 }
+
+// Custom Watchdog Monitor Task
+void watchdogMonitorTask(void *parameter) {
+  while (1) {
+    unsigned long now = millis();
+
+    // Check if Task 1 is stuck
+    if ((now - lastTask1Time) > (WATCHDOG_TIMEOUT * 1000)) {
+      Serial.printf("🚨 WARNING: Task 1 is STUCK at stage %d", lastTask2Stage);
+    }
+
+    // Reset the watchdog for this monitoring task
+//    esp_task_wdt_reset();
+
+    delay(1000);
+  }
+}
+
+void debug_lvgl_mem() {
+  lv_mem_monitor_t mem_mon;
+  lv_mem_monitor(&mem_mon);
+  Serial.printf("LVGL Free: %d, Frag: %d%%, Biggest Block: %d\n",
+                mem_mon.free_size, mem_mon.frag_pct, mem_mon.free_biggest_size);
+  Serial.printf("LVGL Objects: %d\n", lv_obj_get_child_cnt(lv_scr_act()));
+}
+
 
 
 void loop()
 {
-  static unsigned int debug_if_zero = 0;
+  static unsigned long last_debug = millis();
+  static bool debug;
+
+  debug = (millis() - last_debug) > 30000;
   esp_task_wdt_reset();  // Keep resetting the watchdog
+  lastTask1Time = millis();
+
+  lastTask2Stage = 0;
 
 #ifdef GRAPHICS_ENABLE
-    if (debug_if_zero == 0) Serial.print("L1");
+    updateUI(NULL);
+    lastTask2Stage = 10;
     lv_timer_handler(); /* let the GUI do its work */
+    lastTask2Stage = 20;
 #endif
-    if (debug_if_zero == 0) Serial.print("L2");
     ESPNowUtils::loop();
-    if (debug_if_zero == 0) Serial.print("L3");
+    lastTask2Stage = 30;
     gfx_loop();
-    if (debug_if_zero == 0) Serial.print("L4");
+    lastTask2Stage = 40;
     delay(5);
+    lastTask2Stage = 50;
 
-    if (debug_if_zero == 0) {
+    lastTask2Stage = 60;
+
+    if (debug) {
       Serial.printf("Free Heap: %d b, up %d\n", ESP.getFreeHeap(), millis() / 1000);
+      debug_lvgl_mem();
+      last_debug = millis();
     }
-
-  debug_if_zero++;
-  if (debug_if_zero > 5000) debug_if_zero = 0;
 }
 
-void updateStatusBar(lv_timer_t * timer) {
-    lv_label_set_text_fmt(
-            timeLabel,
-            "%s%s %02d:%02d",
-            ESPNowUtils::lastMessageReceivedTime + NET_ACTIVITY_SYMBOL_AGE > millis() ? LV_SYMBOL_DOWN : " ",
-            ESPNowUtils::lastMessageSentTime + NET_ACTIVITY_SYMBOL_AGE > millis() ? LV_SYMBOL_UP : " ",
-            hour(now()),
-            minute(now()));
+void updateStatusBar(unsigned long frequency) {
+    static unsigned long last_update = 0;
+    if ((millis() - last_update) > frequency) {
+      last_update = millis();
+      lv_label_set_text_fmt(
+              timeLabel,
+              "%s%s %02d:%02d",
+              ESPNowUtils::lastMessageReceivedTime + NET_ACTIVITY_SYMBOL_AGE > millis() ? LV_SYMBOL_DOWNLOAD : " ",
+              ESPNowUtils::lastMessageSentTime + NET_ACTIVITY_SYMBOL_AGE > millis() ? LV_SYMBOL_UPLOAD : " ",
+              hour(now()),
+              minute(now()));
+    }
 }
 
 void dataReceivedServerStatus(struct_status_server *status) {
@@ -451,72 +514,67 @@ void dataReceivedControlStatus(struct_status_control *status) {
 
 }
 
-void updateButtons(lv_timer_t * timer) {
-    if (controlButtons.size() < controlStatuses.size()) {
-        for (u_int8_t i = 0; i < controlStatuses.size(); i++) {
-            // do we have this control already created?
-            if (controlButtons.size() <= i) {
-                // add this control
-                lv_obj_t *singleControlContainer = lv_obj_create(controlButtonContainer);
-                lv_obj_set_user_data(singleControlContainer, controlStatuses[i]);
-//                TRACE("Update Buttons 2.01");
-                lv_obj_add_style(singleControlContainer, &style, 0);
-                //TRACE("Update Buttons 2.02");
-                lv_obj_add_style(singleControlContainer, &styleNoPadding, 0);
-                //TRACE("Update Buttons 2.03");
-                lv_obj_set_size(singleControlContainer, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-                //TRACE("Update Buttons 2.04");
+void updateButtons(unsigned long frequency) {
+    static unsigned long last_update = 0;
+    if ((millis() - last_update) > frequency) {
+      last_update = millis();
+      if (controlButtons.size() < controlStatuses.size()) {
+          for (u_int8_t i = 0; i < controlStatuses.size(); i++) {
+              // do we have this control already created?
+              if (controlButtons.size() <= i) {
+                  // add this control
+                  lv_obj_t *singleControlContainer = lv_obj_create(controlButtonContainer);
+                  lv_obj_set_user_data(singleControlContainer, controlStatuses[i]);
+  //                TRACE("Update Buttons 2.01");
+                  lv_obj_add_style(singleControlContainer, &style, 0);
+                  //TRACE("Update Buttons 2.02");
+                  lv_obj_add_style(singleControlContainer, &styleNoPadding, 0);
+                  //TRACE("Update Buttons 2.03");
+                  lv_obj_set_size(singleControlContainer, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+                  //TRACE("Update Buttons 2.04");
 
-                lv_obj_t *btn = lv_btn_create(singleControlContainer);
-                //TRACE("Update Buttons 2.1");
-                lv_obj_set_size(btn, 220, 68);
-                lv_obj_align(btn, LV_ALIGN_BOTTOM_MID, 0, 0);
-                //TRACE("Update Buttons 2.2");
-                lv_obj_add_event_cb(btn, btn_event_cb, LV_EVENT_CLICKED,
-                                    controlStatuses[i]);
-                lv_obj_set_style_border_width(btn, 3, LV_PART_MAIN | LV_STATE_DEFAULT);
-//                TRACE("Update Buttons 2.3");
+                  lv_obj_t *btn = lv_btn_create(singleControlContainer);
+                  //TRACE("Update Buttons 2.1");
+                  lv_obj_set_size(btn, 220, 68);
+                  lv_obj_align(btn, LV_ALIGN_BOTTOM_MID, 0, 0);
+                  //TRACE("Update Buttons 2.2");
+                  lv_obj_add_event_cb(btn, btn_event_cb, LV_EVENT_CLICKED,
+                                      controlStatuses[i]);
+                  lv_obj_set_style_border_width(btn, 3, LV_PART_MAIN | LV_STATE_DEFAULT);
+  //                TRACE("Update Buttons 2.3");
 
-                lv_obj_t *led = lv_led_create(btn);
-                lv_obj_set_size(led, 10, 10);
-//                lv_obj_add_style(btn, &stylePaddingTwo, 0);
-//                lv_obj_set_style_pad_all(btn, 6, LV_PART_MAIN);
-                lv_obj_align(led, LV_ALIGN_TOP_RIGHT, 6, 6);
-                lv_led_set_brightness(led, 150);
-                lv_led_set_color(led, lv_palette_main(LV_PALETTE_RED));
-                lv_led_off(led);
-                // NOTE: not helpful, hiding
-                lv_obj_add_flag(led, LV_OBJ_FLAG_HIDDEN);
 
-                lv_obj_t *label = lv_label_create(btn);
-                lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 0);
-                //TRACE("Update Buttons 2.4");
-                lv_label_set_text_fmt(label, "%s", controlStatuses[i]->name);
-                //TRACE("Update Buttons 2.5");
-                lv_obj_center(label);
-//                TRACE("Update Buttons 3");
+                  lv_obj_t *label = lv_label_create(btn);
+                  lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 0);
+                  //TRACE("Update Buttons 2.4");
+                  lv_label_set_text_fmt(label, "%s", controlStatuses[i]->name);
+                  //TRACE("Update Buttons 2.5");
+                  lv_obj_center(label);
+  //                TRACE("Update Buttons 3");
 
-                lv_obj_t * arc = lv_arc_create(btn);
-                lv_obj_set_size(arc, 35, 35);
-                lv_arc_set_rotation(arc, 135);
-                lv_arc_set_bg_angles(arc, 0, 270);
-                lv_arc_set_value(arc, 1);
-//                lv_arc_set_mode(arc, LV_ARC_MODE_REVERSE);
-                lv_obj_set_style_pad_all(arc, 0, LV_PART_MAIN);
-                lv_obj_add_style(arc, &styleArcIndicator, LV_PART_INDICATOR);
-                lv_obj_add_style(arc, &styleArcMain, LV_PART_MAIN);
-                lv_obj_add_style(arc, &styleArcKnob, LV_PART_KNOB);
+                  lv_obj_t *labelORT = lv_label_create(btn);
+                  lv_obj_align(labelORT, LV_ALIGN_BOTTOM_LEFT, -5, 0);
+                  lv_obj_add_style(labelORT, &styleSmallFont, LV_PART_MAIN);
+//                  lv_obj_set_style_border_color(labelORT, lv_palette_main(LV_PALETTE_GREY), LV_PART_MAIN);
+//                  lv_obj_set_style_border_width(labelORT, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+                  lv_obj_set_style_text_color(labelORT, lv_palette_main(LV_PALETTE_ORANGE), LV_PART_MAIN);
+  //                TRACE("Update Buttons 3");
 
-//                lv_obj_center(arc);
-                lv_obj_align(led, LV_ALIGN_LEFT_MID, 0, 0);
+                  lv_obj_t *labelValue = lv_label_create(btn);
+                  lv_obj_align(labelValue, LV_ALIGN_TOP_RIGHT, 5, -5);
+                  lv_obj_add_style(labelValue, &styleSmallFont, LV_PART_MAIN);
+                  lv_label_set_text(labelValue, "");
+//                  lv_obj_set_style_border_color(labelValue, lv_palette_main(LV_PALETTE_GREY), LV_PART_MAIN);
+//                  lv_obj_set_style_border_width(labelValue, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+                  lv_obj_set_style_text_color(labelValue, lv_palette_main(LV_PALETTE_RED), LV_PART_MAIN);
 
-                controlButtons.push_back(singleControlContainer);
-            }
-        }
-    }
+                  controlButtons.push_back(singleControlContainer);
+              }
+          }
+      }
 
-    // Now the two vectors are the same size so it's safe to loop and update
-    for(lv_obj_t *controlButton : controlButtons){
+      // Now the two vectors are the same size so it's safe to loop and update
+      for(lv_obj_t *controlButton : controlButtons){
         struct_status_control *status = (struct_status_control*)lv_obj_get_user_data(controlButton);
         //TRACE("Update Buttons 5");
 
@@ -524,42 +582,54 @@ void updateButtons(lv_timer_t * timer) {
         lv_obj_t * btn = lv_obj_get_child(controlButton, 0);
         //TRACE("Update Buttons 5.3");
         // 1 child (label is second)
-        lv_obj_t * led = lv_obj_get_child(btn, 0);
+//          lv_obj_t * led = lv_obj_get_child(btn, 0);
         // 2nd child
-        lv_obj_t * label = lv_obj_get_child(btn, 1);
+        lv_obj_t * label = lv_obj_get_child(btn, 0);
 //        TRACE("Update Buttons 5.1");
-        lv_obj_t * arc  = lv_obj_get_child(btn, 2);
+        lv_obj_t * labelORT  = lv_obj_get_child(btn, 1);
+
+        lv_obj_t * labelValue = lv_obj_get_child(btn, 2);
 
         if (status->ORT > 0) {
-          lv_arc_set_value(arc, 100 *  status->EL / (status->ORT + status->EL));
-          lv_obj_clear_flag(arc, LV_OBJ_FLAG_HIDDEN);
+          lv_label_set_text_fmt(labelORT, "%dm", status->ORT / 60);
+//            lv_arc_set_value(arc, 100 *  status->EL / (status->ORT + status->EL));
+          lv_obj_clear_flag(labelORT, LV_OBJ_FLAG_HIDDEN);
         } else {
-          lv_obj_add_flag(arc, LV_OBJ_FLAG_HIDDEN);
+//            lv_label_set_text(labelORT, "");
+          lv_obj_add_flag(labelORT, LV_OBJ_FLAG_HIDDEN);
         }
 
         if (status->e_value) {
-            lv_led_on(led);
+//              lv_led_on(led);
             lv_obj_set_style_border_color(btn, lv_palette_main(LV_PALETTE_RED), LV_PART_MAIN | LV_STATE_DEFAULT);
         } else {
-            lv_led_off(led);
+//              lv_led_off(led);
             lv_obj_set_style_border_color(btn, lv_palette_main(LV_PALETTE_BLUE), LV_PART_MAIN | LV_STATE_DEFAULT);
         }
         //TRACE("Update Buttons 5.2");
 
 
-        if (strcmp(status->type, "off-low-high") == 0 && status->e_value > 0) {
+      if (strcmp(status->type, "off-low-high") == 0) {
+        if (status->e_value > 0) {
 //            TRACE("Update Buttons 5.4");
-            lv_label_set_text_fmt(label, "%s (%s)", status->name, status->e_value == 1 ? "LOW" : "HIGH");
-//            TRACE("Update Buttons 5.5");
-            lv_led_set_color(led, lv_palette_main(status->e_value == 1 ? LV_PALETTE_RED : LV_PALETTE_YELLOW));
-            lv_obj_set_style_border_color(btn, lv_palette_main(status->e_value == 1 ? LV_PALETTE_RED : LV_PALETTE_ORANGE), LV_PART_MAIN | LV_STATE_DEFAULT);
-        } else if (strcmp(status->type, "sensor-based") == 0) {
-            lv_label_set_text_fmt(label, "%s (%d)", status->name, status->value);
+//              lv_label_set_text_fmt(label, "%s (%s)", status->name, status->e_value == 1 ? "LOW" : "HIGH");
+          lv_label_set_text_fmt(labelValue, "%s", status->e_value == 1 ? "LOW" : "HIGH");
+          lv_obj_clear_flag(labelValue, LV_OBJ_FLAG_HIDDEN);
         } else {
-            lv_label_set_text(label, status->name);
+          lv_obj_add_flag(labelValue, LV_OBJ_FLAG_HIDDEN);
         }
+//            TRACE("Update Buttons 5.5");
+//              lv_led_set_color(led, lv_palette_main(status->e_value == 1 ? LV_PALETTE_RED : LV_PALETTE_YELLOW));
+        lv_obj_set_style_border_color(btn, lv_palette_main(status->e_value == 1 ? LV_PALETTE_RED : LV_PALETTE_ORANGE), LV_PART_MAIN | LV_STATE_DEFAULT);
+      } else if (strcmp(status->type, "sensor-based") == 0) {
+//              lv_label_set_text_fmt(label, "%s (%d)", status->name, status->value);
+        lv_label_set_text_fmt(labelValue, "%dF", status->value);
+      } else {
+        lv_label_set_text(label, status->name);
+      }
     }
-//    TRACE("Update Buttons 6");
+  //    TRACE("Update Buttons 6");
+  }
 
 }
 
