@@ -51,6 +51,7 @@ lv_style_t styleArcKnob;
 lv_obj_t * statusLabel = NULL;
 lv_obj_t * bannerLabel = NULL;
 lv_obj_t * timeLabel = NULL;
+struct_status_server * lastServerStatus;
 std::vector<lv_obj_t *> controlButtons;
 std::vector<struct_status_control *> controlStatuses;
 lv_obj_t * controlButtonContainer = NULL;
@@ -348,7 +349,6 @@ void createSensorBasedDialog() {
     lv_label_set_text(btnLabel, "Close");
     //lv_obj_set_style_text_align(btnLabel, LV_TEXT_ALIGN_CENTER, 0);
 
-
     TRACE("mbox 8");
 }
 
@@ -386,6 +386,7 @@ void setup()
     ESPNowUtils::registerEspCommStatusCallBackHandler((ESPNowUtils::esp_comm_status_callback)showStatusMessage);
     ESPNowUtils::setup();
 
+    lastServerStatus = (struct_status_server *)malloc(sizeof(struct_status_server));
 
     // custom watchdog
     xTaskCreate(watchdogMonitorTask, "WDTMonitor", 4096, NULL, 1, NULL);
@@ -448,6 +449,7 @@ void loop()
 
     if (debug) {
       Serial.printf("Free Heap: %d b, up %d\n", ESP.getFreeHeap(), millis() / 1000);
+      Serial.printf("Stack High Water Mark: %d bytes\n", uxTaskGetStackHighWaterMark(NULL));
       debug_lvgl_mem();
       last_debug = millis();
     }
@@ -457,6 +459,9 @@ void updateStatusBar(unsigned long frequency) {
     static unsigned long last_update = 0;
     if ((millis() - last_update) > frequency) {
       last_update = millis();
+
+      lv_label_set_text_fmt(bannerLabel, "%s @%.1fF ", lastServerStatus->server_name, lastServerStatus->water_temp);
+
       lv_label_set_text_fmt(
               timeLabel,
               "%s%s %02d:%02d",
@@ -475,10 +480,9 @@ void dataReceivedServerStatus(struct_status_server *status) {
 //    TRACE("Set Time");
 //    Serial.printf("Received touchscreen timeout %d, last touch time %d, millis %d, remaining time %d, bright %d", status->touchscreen_timeout, last_gfx_touch_time, millis(), (last_gfx_touch_time + gfx_screen_timeout) - millis(), displayBrightness);
 
-    if (bannerLabel != NULL && timeLabel != NULL) { // already initialized
-        lv_label_set_text_fmt(bannerLabel, "%s @%.1fF ", status->server_name, status->water_temp);
-//        TRACE("Updated server status label 1");
-    }
+    // save it and let graphics update from the right thread later
+    memcpy(lastServerStatus, status, sizeof(struct_status_server));
+
 //    TRACE("Updated server status labels");
 }
 
@@ -553,20 +557,22 @@ void updateButtons(unsigned long frequency) {
   //                TRACE("Update Buttons 3");
 
                   lv_obj_t *labelORT = lv_label_create(btn);
-                  lv_obj_align(labelORT, LV_ALIGN_BOTTOM_LEFT, -5, 0);
+                  lv_obj_align(labelORT, LV_ALIGN_BOTTOM_LEFT, -10, 5);
                   lv_obj_add_style(labelORT, &styleSmallFont, LV_PART_MAIN);
 //                  lv_obj_set_style_border_color(labelORT, lv_palette_main(LV_PALETTE_GREY), LV_PART_MAIN);
 //                  lv_obj_set_style_border_width(labelORT, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
                   lv_obj_set_style_text_color(labelORT, lv_palette_main(LV_PALETTE_ORANGE), LV_PART_MAIN);
+                  lv_obj_set_style_bg_color(labelORT, lv_color_white(), 0);
+                  lv_obj_set_style_bg_opa(labelORT, LV_OPA_50, 0);
   //                TRACE("Update Buttons 3");
 
                   lv_obj_t *labelValue = lv_label_create(btn);
-                  lv_obj_align(labelValue, LV_ALIGN_TOP_RIGHT, 5, -5);
+                  lv_obj_align(labelValue, LV_ALIGN_TOP_RIGHT, 10, -5);
                   lv_obj_add_style(labelValue, &styleSmallFont, LV_PART_MAIN);
                   lv_label_set_text(labelValue, "");
 //                  lv_obj_set_style_border_color(labelValue, lv_palette_main(LV_PALETTE_GREY), LV_PART_MAIN);
 //                  lv_obj_set_style_border_width(labelValue, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
-                  lv_obj_set_style_text_color(labelValue, lv_palette_main(LV_PALETTE_RED), LV_PART_MAIN);
+                  lv_obj_set_style_text_color(labelValue, lv_palette_main(LV_PALETTE_AMBER), LV_PART_MAIN);
 
                   controlButtons.push_back(singleControlContainer);
               }
@@ -591,7 +597,13 @@ void updateButtons(unsigned long frequency) {
         lv_obj_t * labelValue = lv_obj_get_child(btn, 2);
 
         if (status->ORT > 0) {
-          lv_label_set_text_fmt(labelORT, "%dm", status->ORT / 60);
+          if (status->ORT > 3600) {
+            lv_label_set_text_fmt(labelORT, "%dh", status->ORT / 3600);
+          } else if (status->ORT > 60) {
+            lv_label_set_text_fmt(labelORT, "%dm", status->ORT / 60);
+          } else {
+            lv_label_set_text_fmt(labelORT, "%ds", status->ORT);
+          }
 //            lv_arc_set_value(arc, 100 *  status->EL / (status->ORT + status->EL));
           lv_obj_clear_flag(labelORT, LV_OBJ_FLAG_HIDDEN);
         } else {
@@ -613,10 +625,13 @@ void updateButtons(unsigned long frequency) {
         if (status->e_value > 0) {
 //            TRACE("Update Buttons 5.4");
 //              lv_label_set_text_fmt(label, "%s (%s)", status->name, status->e_value == 1 ? "LOW" : "HIGH");
-          lv_label_set_text_fmt(labelValue, "%s", status->e_value == 1 ? "LOW" : "HIGH");
+          lv_label_set_text(labelValue, status->e_value == 1 ? "LOW" : "HIGH");
           lv_obj_clear_flag(labelValue, LV_OBJ_FLAG_HIDDEN);
         } else {
-          lv_obj_add_flag(labelValue, LV_OBJ_FLAG_HIDDEN);
+          lv_label_set_text(labelValue, "OFF");
+          if (status->ORT <= 0) {  // if we're in override, show "OFF"
+            lv_obj_add_flag(labelValue, LV_OBJ_FLAG_HIDDEN);
+          }
         }
 //            TRACE("Update Buttons 5.5");
 //              lv_led_set_color(led, lv_palette_main(status->e_value == 1 ? LV_PALETTE_RED : LV_PALETTE_YELLOW));

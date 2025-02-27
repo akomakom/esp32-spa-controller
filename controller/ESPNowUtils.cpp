@@ -91,7 +91,7 @@ void ESPNowUtils::OnDataRecv(const esp_now_recv_info* info, const uint8_t *incom
             memcpy(&pairingData, incomingData, sizeof(pairingData));
             Serial.println(pairingData.msgType);
             Serial.println(pairingData.board_id);
-            Serial.print("Pairing request from: ");
+            Serial.printf("Pairing request on channel %d (we are on %d) from: ", pairingData.channel, chan);
             printMAC(mac_addr);
             Serial.println();
             Serial.println(pairingData.channel);
@@ -101,7 +101,7 @@ void ESPNowUtils::OnDataRecv(const esp_now_recv_info* info, const uint8_t *incom
                     // Server is in AP_STA mode: peers need to send data to server soft AP MAC address
                     WiFi.softAPmacAddress(pairingData.macAddr);
                     pairingData.channel = chan;
-                    Serial.println("send response");
+                    Serial.println("send pairing response");
                     esp_err_t result = esp_now_send(mac_addr, (uint8_t *) &pairingData, sizeof(pairingData));
                     if (addPeer(mac_addr)) {
                         if (pairedCallback != NULL) {
