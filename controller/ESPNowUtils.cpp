@@ -31,7 +31,7 @@ bool ESPNowUtils::addPeer(const uint8_t *peer_addr) {      // add pairing
     const esp_now_peer_info_t *peer = &slave;
     memcpy(slave.peer_addr, peer_addr, 6);
 
-    slave.channel = chan; // pick a channel
+//    slave.channel = WiFi.channel(); // pick a channel
     slave.encrypt = 0; // no encryption
     // check if the peer exists
     bool exists = esp_now_is_peer_exist(slave.peer_addr);
@@ -91,16 +91,16 @@ void ESPNowUtils::OnDataRecv(const esp_now_recv_info* info, const uint8_t *incom
             memcpy(&pairingData, incomingData, sizeof(pairingData));
             Serial.println(pairingData.msgType);
             Serial.println(pairingData.board_id);
-            Serial.printf("Pairing request on channel %d (we are on %d) from: ", pairingData.channel, chan);
+            Serial.printf("Pairing request on channel %d (we are on %d) from: ", pairingData.channel, WiFi.channel());
             printMAC(mac_addr);
             Serial.println();
-            Serial.println(pairingData.channel);
+            WiFi.printDiag(Serial);
             if (pairingData.board_id > 0) {     // do not replay to server itself
                 if (pairingData.msgType == PAIRING) {
                     pairingData.board_id = 0;       // 0 is server
                     // Server is in AP_STA mode: peers need to send data to server soft AP MAC address
                     WiFi.softAPmacAddress(pairingData.macAddr);
-                    pairingData.channel = chan;
+//                    pairingData.channel = WiFi.channel();
                     Serial.println("send pairing response");
                     esp_err_t result = esp_now_send(mac_addr, (uint8_t *) &pairingData, sizeof(pairingData));
                     if (addPeer(mac_addr)) {
@@ -142,7 +142,6 @@ void ESPNowUtils::setup() {
     Serial.print("Server SOFT AP MAC Address:  ");
     Serial.println(WiFi.softAPmacAddress());
 
-    chan = WiFi.channel();
     Serial.print("Station IP Address: ");
     Serial.println(WiFi.localIP());
     Serial.print("Wi-Fi Channel: ");

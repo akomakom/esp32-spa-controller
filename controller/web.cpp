@@ -1,3 +1,4 @@
+#include "core.h"
 #include "web.h"
 
 
@@ -317,6 +318,14 @@ void setupServerDefaultActions() {
 
 
     server.on("/list", HTTP_GET, handleFileList);
+
+    server.on("/configureWifi", HTTP_POST, []() {
+      Serial.printf("Configuring WiFi to %s/%s", server.arg("wifi_ssid"),server.arg("wifi_pass"));
+      app_preferences.putString("wifi_ssid", server.arg("wifi_ssid").c_str());
+      app_preferences.putString("wifi_pass", server.arg("wifi_pass").c_str());
+      Serial.printf("WIFI Configuration set to %s/%s, restarting", app_preferences.getString("wifi_ssid"), app_preferences.getString("wifi_pass"));
+      ESP.restart();
+    });
 
     //called when the url is not defined here
     //use it to load content from SPIFFS

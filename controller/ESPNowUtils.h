@@ -31,7 +31,6 @@ public:
     inline static struct_status_control outgoingStatusControl;
 private:
     inline static esp_now_peer_info_t slave;
-    inline static int chan;
 
     static MessageType messageType;
 

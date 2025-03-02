@@ -133,10 +133,40 @@ void setupWIFI() {
     // Set the device as a Station and Soft Access Point simultaneously
     WiFi.mode(WIFI_AP_STA);
     // Connect to WiFi network
-    WiFi.begin(WIFI_NAME, WIFI_PASS);
-    Serial.printf("WiFi begin called");
+    if (app_preferences.isKey("wifi_ssid")) {
+      WiFi.begin(app_preferences.getString("wifi_ssid"), app_preferences.getString("wifi_pass"));
+      Serial.printf("WiFi begin called, connecting to %s", app_preferences.getString("wifi_ssid"));
+    } else {
+      Serial.println("WiFi not configured yet, not starting.");
+    }
     delay(1000);
 }
+
+void setupSoftAP() {
+    //
+    WiFi.softAP(SOFTAP_WIFI_NAME, SOFTAP_WIFI_PASS);
+    Serial.printf("Software Access Point available at %s/%s", SOFTAP_WIFI_NAME, SOFTAP_WIFI_PASS == NULL ? "(NOT SET)": SOFTAP_WIFI_PASS);
+}
+
+//
+//void handleRequest()
+//{
+//  if (server.method() == HTTP_POST) {
+//    strncpy(wiFiCredentials.ssid, server.arg("ssid").c_str(), sizeof(wiFiCredentials.ssid));
+//    strncpy(wiFiCredentials.password, server.arg("password").c_str(), sizeof(wiFiCredentials.password));
+//
+//    wiFiCredentials.ssid[server.arg("ssid").length()] = wiFiCredentials.password[server.arg("password").length()] = 0;
+//
+//    EEPROM.put(0, wiFiCredentials);
+//    EEPROM.commit();
+//
+//    const char * content = "<html><head> <link rel=\"stylesheet\" href=\"https://netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap.min.css\"> <style>body{background: #eee !important;}.wrapper{margin-top: 80px; margin-bottom: 80px;}.form-signin, .result-message{max-width: 380px; padding: 15px 35px 45px; margin: 0 auto; background-color: #fff; border: 1px solid rgba(0, 0, 0, 0.1);}.form-signin .form-signin-heading{margin-bottom: 30px;}.form-signin .form-control{position: relative; font-size: 16px; height: auto; padding: 10px; -webkit-box-sizing: border-box; -moz-box-sizing: border-box; box-sizing: border-box;}.form-signin .form-control:focus{z-index: 2;}.form-signin input[type=text]{margin-bottom: -1px; border-bottom-left-radius: 0; border-bottom-right-radius: 0;}.form-signin input[type=password]{margin-bottom: 20px; border-top-left-radius: 0; border-top-right-radius: 0;}.result-message{text-align: center;}</style></head><body> <div class=\"wrapper\"> <div class=\"result-message\"> The Wi-Fi credentials have been stored. <br/> Please reboot the device! </div></div></body></html> ";
+//    server.send(200, "text/html", content);
+//  } else {
+//    const char * formHtml = "<html><head> <link rel=\"stylesheet\" href=\"https://netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap.min.css\"> <style>body{background: #eee !important;}.wrapper{margin-top: 80px; margin-bottom: 80px;}.form-signin{max-width: 380px; padding: 15px 35px 45px; margin: 0 auto; background-color: #fff; border: 1px solid rgba(0, 0, 0, 0.1);}.form-signin .form-signin-heading{margin-bottom: 30px;}.form-signin .form-control{position: relative; font-size: 16px; height: auto; padding: 10px; -webkit-box-sizing: border-box; -moz-box-sizing: border-box; box-sizing: border-box;}.form-signin .form-control:focus{z-index: 2;}.form-signin input[type=text]{margin-bottom: -1px; border-bottom-left-radius: 0; border-bottom-right-radius: 0;}.form-signin input[type=password]{margin-bottom: 20px; border-top-left-radius: 0; border-top-right-radius: 0;}</style></head><body> <div class=\"wrapper\"> <form class=\"form-signin\" method=\"POST\"> <h2 class=\"form-signin-heading\">Connect To Wi-Fi</h2> <input type=\"text\" class=\"form-control\" name=\"ssid\" placeholder=\"SSID\" required=\"\" autofocus=\"\"/> <input type=\"password\" class=\"form-control\" name=\"password\" placeholder=\"Password\" required=\"\"/> <button class=\"btn btn-lg btn-primary btn-block\" type=\"submit\">Save</button> </form> </div></body></html> ";
+//    server.send(200, "text/html", formHtml);
+//  }
+//}
 
 void setup(void) {
     Serial.begin(115200);
@@ -146,7 +176,7 @@ void setup(void) {
     }
 
     setupNTP();
-
+    setupSoftAP();
     setupWIFI();
 
 //    /*use mdns for host name resolution*/
@@ -308,7 +338,7 @@ void WiFiStationConnected(WiFiEvent_t event, WiFiEventInfo_t info){
     Serial.println("");
 
     Serial.print("Connected to ");
-    Serial.print(WIFI_NAME);
+    Serial.print(app_preferences.getString("wifi_ssid"));
 }
 
 void WiFiGotIP(WiFiEvent_t event, WiFiEventInfo_t info){
@@ -322,5 +352,6 @@ void WiFiStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info){
     Serial.print("WiFi lost connection. Reason: ");
     Serial.println(info.wifi_sta_disconnected.reason);
     Serial.println("Trying to Reconnect");
-    WiFi.begin(WIFI_NAME, WIFI_PASS);
+    WiFi.begin(app_preferences.getString("wifi_ssid"), app_preferences.getString("wifi_pass"));
+
 }

@@ -8,6 +8,16 @@
       color: red;
     }
 
+    #configbutton {
+      position: absolute;
+      right: 5px;
+      bottom: 5px;
+      font-size: x-large;
+    }
+    #systemconfigdialog {
+      display: none;
+    }
+
     .spacontrol {
       box-shadow: 1px 1px 4px 1px #8dcbe6;
       background: linear-gradient(to bottom, #33bdef 5%, #019ad2 100%);
@@ -112,10 +122,10 @@
 
 
   </style>
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
-  <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.13.2/themes/smoothness/jquery-ui.css">
-  <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/humanize-duration/3.29.0/humanize-duration.min.js"></script>
+  <script src="jquery.min.js"></script><!-- https://ajax.googleapis.com/ajax/libs/jquery/3.7.0/jquery.min.js -->
+  <link rel="stylesheet" href="jquery-ui.css"><!-- https://ajax.googleapis.com/ajax/libs/jqueryui/1.13.2/themes/smoothness/jquery-ui.css -->
+  <script src="jquery-ui.min.js"></script><!-- https://ajax.googleapis.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js -->
+  <script src="humanize-duration.min.js"></script><!-- https://cdnjs.cloudflare.com/ajax/libs/humanize-duration/3.29.0/humanize-duration.min.js -->
   <script>
 
     $(document).ready(function() {
@@ -128,6 +138,43 @@
       let controlName = '';
       let controlValue = 0;
       let durationDialog;
+
+      $('#configbutton').click(function () {
+        let dialog = $( "#systemconfigdialog" ).dialog({
+          title: `Configure WiFi`,
+//                  autoOpen: false,
+          height:'auto', width:'auto',
+          modal: true,
+          buttons: {
+            'Save': function () {
+              let data = {
+                wifi_ssid: $('input[name="wifi_ssid"]').val(),
+                wifi_pass: $('input[name="wifi_pass"]').val()
+              }
+              $.ajax({
+                type: "POST",
+                url: '/configureWifi',
+                data: data,
+                success: function() {
+                  dialog.dialog('close');
+                },
+                error: function (e) {
+                  status.text(e.statusText);
+                },
+                dataType: 'json'
+              });
+            },
+            'Cancel': function() {
+              $(this).dialog('close');
+            }
+          },
+
+          close: function() {
+
+          }
+        });
+
+      });
 
       $.each(durationOptions, function(index, duration) {
         let option = $('<button type="button" class="duration-option"/>');
@@ -425,7 +472,7 @@
   </script>
 </head>
 <body>
-<div id="spastatus">C
+<div id="spastatus">
   <div class="metric-widget" id="water">
     <div class="title">Water</div>
     <div class="data">
@@ -449,7 +496,26 @@
   </div>
 
 </div>
+
+<div id="configbutton">&#9881;</div>
+
 <div id="spacontrols">
+</div>
+
+<div id="systemconfigdialog">
+  This configures the WiFi network that this controller should connect to.
+  <br/>
+  This is independent of the built-in WiFi AP.
+  <form>
+    <label>SSID</label>
+    <input type='text' size=25 name='wifi_ssid'/>
+
+    <br/>
+    <label>Password</label>
+    <input type='text' size=25 name='wifi_pass'/>
+
+
+  </form>
 </div>
 
 <div id="templates" style="display: none">
