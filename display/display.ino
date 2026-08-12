@@ -472,8 +472,12 @@ void updateStatusBar(unsigned long frequency) {
     if ((millis() - last_update) > frequency) {
       last_update = millis();
 
-      lv_label_set_text_fmt(bannerLabel, "%s @%.1f%c ", lastServerStatus->server_name,
-                            toDisplayTemp(lastServerStatus->water_temp), displayUnitChar());
+      // LVGL's printf has float formatting disabled (LV_SPRINTF_USE_FLOAT 0), so build
+      // the string with the standard library's snprintf (which supports %f) instead.
+      char banner[48];
+      snprintf(banner, sizeof(banner), "%s @%.1f%c ", lastServerStatus->server_name,
+               toDisplayTemp(lastServerStatus->water_temp), displayUnitChar());
+      lv_label_set_text(bannerLabel, banner);
 
       lv_label_set_text_fmt(
               timeLabel,
@@ -649,7 +653,7 @@ void updateButtons(unsigned long frequency) {
 
       } else if (strcmp(status->type, "sensor-based") == 0) {
 //              lv_label_set_text_fmt(label, "%s (%d)", status->name, status->value);
-        lv_label_set_text_fmt(labelValue, "%.0f%c", toDisplayTemp((float)status->value), displayUnitChar());
+        lv_label_set_text_fmt(labelValue, "%d%c", (int)lroundf(toDisplayTemp((float)status->value)), displayUnitChar());
       } else {
         lv_label_set_text(label, status->name);
       }
@@ -704,7 +708,7 @@ static void btn_event_cb(lv_event_t * e)
             TRACE("SENS DISP 2");
 //            lv_spinbox_set_range(sensorBasedControlSetpointLabel, status->min, status->max);
 //            lv_spinbox_set_value(sensorBasedControlSetpointLabel, status->value);
-            lv_label_set_text_fmt(sensorBasedControlSetpointLabel, "%.0f%c", toDisplayTemp((float)status->value), displayUnitChar());
+            lv_label_set_text_fmt(sensorBasedControlSetpointLabel, "%d%c", (int)lroundf(toDisplayTemp((float)status->value)), displayUnitChar());
             TRACE("SENS DISP 2.1");
             lv_label_set_text_fmt(sensorBasedControlDescription, "Adjust setpoint for %s", status->name);
             TRACE("SENS DISP 3");
@@ -739,7 +743,7 @@ static void lv_spinbox_event_cb(lv_event_t * e)
                 }
                 break;
         }
-        lv_label_set_text_fmt(sensorBasedControlSetpointLabel, "%.0f%c", toDisplayTemp((float)sensorBasedControlSetpointValue), displayUnitChar());
+        lv_label_set_text_fmt(sensorBasedControlSetpointLabel, "%d%c", (int)lroundf(toDisplayTemp((float)sensorBasedControlSetpointValue)), displayUnitChar());
     }
     TRACE("SENS CB 3");
 
