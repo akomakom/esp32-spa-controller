@@ -16,36 +16,36 @@
 // #define TOUCH_MAP_Y1 0
 // #define TOUCH_MAP_Y2 320
 
-/* uncomment for GT911 (correct for the Sunton 4.3" ESP32-4827S043 capacitive panel) */
- #define TOUCH_GT911
- #define TOUCH_GT911_SCL 20
- #define TOUCH_GT911_SDA 19
- #define TOUCH_GT911_INT -1
- #define TOUCH_GT911_RST 38
- #define TOUCH_GT911_ROTATION ROTATION_NORMAL
- #define TOUCH_MAP_X1 480
- #define TOUCH_MAP_X2 0
- #define TOUCH_MAP_Y1 272
- #define TOUCH_MAP_Y2 0
+/* uncomment for GT911 */
+// #define TOUCH_GT911
+// #define TOUCH_GT911_SCL 20
+// #define TOUCH_GT911_SDA 19
+// #define TOUCH_GT911_INT -1
+// #define TOUCH_GT911_RST 38
+// #define TOUCH_GT911_ROTATION ROTATION_NORMAL
+// #define TOUCH_MAP_X1 480
+// #define TOUCH_MAP_X2 0
+// #define TOUCH_MAP_Y1 272
+// #define TOUCH_MAP_Y2 0
 
-/* uncomment for XPT2046 (resistive CYD boards; NOT the 4827S043) */
-// #define TOUCH_XPT2046
-// #define TOUCH_XPT2046_SCK 12
-// #define TOUCH_XPT2046_MISO 13
-// #define TOUCH_XPT2046_MOSI 11
-// #define TOUCH_XPT2046_CS 38
-// #define TOUCH_XPT2046_INT 18
-// #define TOUCH_XPT2046_ROTATION 0
+/* uncomment for XPT2046 */
+ #define TOUCH_XPT2046
+ #define TOUCH_XPT2046_SCK 12
+ #define TOUCH_XPT2046_MISO 13
+ #define TOUCH_XPT2046_MOSI 11
+ #define TOUCH_XPT2046_CS 38
+ #define TOUCH_XPT2046_INT 18
+ #define TOUCH_XPT2046_ROTATION 0
 // 100-4000 => 11 - 407 (original)
 // 0-4100 => 33-363
 // 0-4500 => 63-400  (sharp pointer)
 // 500-4500 => 81-455
 // 500-5000 => 116 - 460
 // 0 - 5000 => 105 - 410
-// #define TOUCH_MAP_X1 3800
-// #define TOUCH_MAP_X2 300
-// #define TOUCH_MAP_Y1 300
-// #define TOUCH_MAP_Y2 3750
+ #define TOUCH_MAP_X1 3800
+ #define TOUCH_MAP_X2 300
+ #define TOUCH_MAP_Y1 300
+ #define TOUCH_MAP_Y2 3750
 
 int touch_last_x = 0, touch_last_y = 0;
 
@@ -56,11 +56,9 @@ FT6X36 ts(&Wire, TOUCH_FT6X36_INT);
 bool touch_touched_flag = true, touch_released_flag = true;
 
 #elif defined(TOUCH_GT911)
-// bb_captouch (bitbank2) instead of TAMC_GT911: the latter's I2C sequence breaks
-// on the Arduino-ESP32 3.x i2c-ng driver (ESP_ERR_INVALID_STATE / garbage coords).
-#include <bb_captouch.h>
-BBCapTouch bbct;
-TOUCHINFO gt_ti;
+#include <Wire.h>
+#include "TAMC_GT911.h"
+TAMC_GT911 ts = TAMC_GT911(TOUCH_GT911_SDA, TOUCH_GT911_SCL, TOUCH_GT911_INT, TOUCH_GT911_RST, max(TOUCH_MAP_X1, TOUCH_MAP_X2), max(TOUCH_MAP_Y1, TOUCH_MAP_Y2));
 
 #elif defined(TOUCH_XPT2046)
 #include "XPT2046_Touchscreen.h"
@@ -118,8 +116,9 @@ void touch_init()
   ts.registerTouchHandler(touch);
 
 #elif defined(TOUCH_GT911)
-  // bb_captouch resets the controller, detects the I2C address, and configures the bus.
-  bbct.init(TOUCH_GT911_SDA, TOUCH_GT911_SCL, TOUCH_GT911_RST, TOUCH_GT911_INT);
+  Wire.begin(TOUCH_GT911_SDA, TOUCH_GT911_SCL);
+  ts.begin();
+  ts.setRotation(TOUCH_GT911_ROTATION);
 
 #elif defined(TOUCH_XPT2046)
   SPI.begin(TOUCH_XPT2046_SCK, TOUCH_XPT2046_MISO, TOUCH_XPT2046_MOSI, TOUCH_XPT2046_CS);
@@ -139,7 +138,9 @@ bool touch_has_signal()
   return true;
 
 #elif defined(TOUCH_XPT2046)
-  return ts.tirqTouched();
+  // Gate on the real PENIRQ pin level (LOW = touched). The library's latched
+  // tirqTouched() gets stuck set under this toolchain, causing phantom touches.
+  return digitalRead(TOUCH_XPT2046_INT) == LOW;
 
 #else
   return false;
@@ -160,14 +161,15 @@ bool touch_touched()
   }
 
 #elif defined(TOUCH_GT911)
-  if (bbct.getSamples(&gt_ti) && gt_ti.count > 0)
+  ts.read();
+  if (ts.isTouched)
   {
 #if defined(TOUCH_SWAP_XY)
-    touch_last_x = map(gt_ti.y[0], TOUCH_MAP_X1, TOUCH_MAP_X2, 0, gfx->width() - 1);
-    touch_last_y = map(gt_ti.x[0], TOUCH_MAP_Y1, TOUCH_MAP_Y2, 0, gfx->height() - 1);
+    touch_last_x = map(ts.points[0].y, TOUCH_MAP_X1, TOUCH_MAP_X2, 0, gfx->width() - 1);
+    touch_last_y = map(ts.points[0].x, TOUCH_MAP_Y1, TOUCH_MAP_Y2, 0, gfx->height() - 1);
 #else
-    touch_last_x = map(gt_ti.x[0], TOUCH_MAP_X1, TOUCH_MAP_X2, 0, gfx->width() - 1);
-    touch_last_y = map(gt_ti.y[0], TOUCH_MAP_Y1, TOUCH_MAP_Y2, 0, gfx->height() - 1);
+    touch_last_x = map(ts.points[0].x, TOUCH_MAP_X1, TOUCH_MAP_X2, 0, gfx->width() - 1);
+    touch_last_y = map(ts.points[0].y, TOUCH_MAP_Y1, TOUCH_MAP_Y2, 0, gfx->height() - 1);
 #endif
     return true;
   }
