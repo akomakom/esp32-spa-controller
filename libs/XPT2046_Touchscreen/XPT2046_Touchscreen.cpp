@@ -25,7 +25,9 @@
 #define Z_THRESHOLD     400
 #define Z_THRESHOLD_INT	75
 #define MSEC_THRESHOLD  3
-#define SPI_SETTING     SPISettings(2000000, MSBFIRST, SPI_MODE0)
+// Lowered from 2 MHz: under the ESP32-S3 / Arduino-3.x SPI the ADC wasn't settling,
+// giving non-linear (skewed) coordinates. 500 kHz gives ample settling time.
+#define SPI_SETTING     SPISettings(500000, MSBFIRST, SPI_MODE0)
 
 static XPT2046_Touchscreen 	*isrPinptr;
 void isrPin(void);
