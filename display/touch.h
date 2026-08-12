@@ -56,9 +56,11 @@ FT6X36 ts(&Wire, TOUCH_FT6X36_INT);
 bool touch_touched_flag = true, touch_released_flag = true;
 
 #elif defined(TOUCH_GT911)
-#include <Wire.h>
-#include "TAMC_GT911.h"
-TAMC_GT911 ts = TAMC_GT911(TOUCH_GT911_SDA, TOUCH_GT911_SCL, TOUCH_GT911_INT, TOUCH_GT911_RST, max(TOUCH_MAP_X1, TOUCH_MAP_X2), max(TOUCH_MAP_Y1, TOUCH_MAP_Y2));
+// bb_captouch (bitbank2) instead of TAMC_GT911: the latter's I2C sequence breaks
+// on the Arduino-ESP32 3.x i2c-ng driver (ESP_ERR_INVALID_STATE / garbage coords).
+#include <bb_captouch.h>
+BBCapTouch bbct;
+TOUCHINFO gt_ti;
 
 #elif defined(TOUCH_XPT2046)
 #include "XPT2046_Touchscreen.h"
@@ -116,9 +118,8 @@ void touch_init()
   ts.registerTouchHandler(touch);
 
 #elif defined(TOUCH_GT911)
-  Wire.begin(TOUCH_GT911_SDA, TOUCH_GT911_SCL);
-  ts.begin();
-  ts.setRotation(TOUCH_GT911_ROTATION);
+  // bb_captouch resets the controller, detects the I2C address, and configures the bus.
+  bbct.init(TOUCH_GT911_SDA, TOUCH_GT911_SCL, TOUCH_GT911_RST, TOUCH_GT911_INT);
 
 #elif defined(TOUCH_XPT2046)
   SPI.begin(TOUCH_XPT2046_SCK, TOUCH_XPT2046_MISO, TOUCH_XPT2046_MOSI, TOUCH_XPT2046_CS);
@@ -159,15 +160,14 @@ bool touch_touched()
   }
 
 #elif defined(TOUCH_GT911)
-  ts.read();
-  if (ts.isTouched)
+  if (bbct.getSamples(&gt_ti) && gt_ti.count > 0)
   {
 #if defined(TOUCH_SWAP_XY)
-    touch_last_x = map(ts.points[0].y, TOUCH_MAP_X1, TOUCH_MAP_X2, 0, gfx->width() - 1);
-    touch_last_y = map(ts.points[0].x, TOUCH_MAP_Y1, TOUCH_MAP_Y2, 0, gfx->height() - 1);
+    touch_last_x = map(gt_ti.y[0], TOUCH_MAP_X1, TOUCH_MAP_X2, 0, gfx->width() - 1);
+    touch_last_y = map(gt_ti.x[0], TOUCH_MAP_Y1, TOUCH_MAP_Y2, 0, gfx->height() - 1);
 #else
-    touch_last_x = map(ts.points[0].x, TOUCH_MAP_X1, TOUCH_MAP_X2, 0, gfx->width() - 1);
-    touch_last_y = map(ts.points[0].y, TOUCH_MAP_Y1, TOUCH_MAP_Y2, 0, gfx->height() - 1);
+    touch_last_x = map(gt_ti.x[0], TOUCH_MAP_X1, TOUCH_MAP_X2, 0, gfx->width() - 1);
+    touch_last_y = map(gt_ti.y[0], TOUCH_MAP_Y1, TOUCH_MAP_Y2, 0, gfx->height() - 1);
 #endif
     return true;
   }
