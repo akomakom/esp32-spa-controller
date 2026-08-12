@@ -42,10 +42,12 @@
 // 500-4500 => 81-455
 // 500-5000 => 116 - 460
 // 0 - 5000 => 105 - 410
- #define TOUCH_MAP_X1 3800
- #define TOUCH_MAP_X2 300
- #define TOUCH_MAP_Y1 300
- #define TOUCH_MAP_Y2 3750
+// Calibrated 2026-08-12 from corner touches on this panel (raw X 181..2303, Y 658..3589).
+// X1=left edge (high raw x), X2=right edge; Y1=top edge (low raw y), Y2=bottom edge.
+ #define TOUCH_MAP_X1 2300
+ #define TOUCH_MAP_X2 180
+ #define TOUCH_MAP_Y1 660
+ #define TOUCH_MAP_Y2 3590
 
 int touch_last_x = 0, touch_last_y = 0;
 
