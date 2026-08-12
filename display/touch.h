@@ -16,36 +16,36 @@
 // #define TOUCH_MAP_Y1 0
 // #define TOUCH_MAP_Y2 320
 
-/* uncomment for GT911 */
-// #define TOUCH_GT911
-// #define TOUCH_GT911_SCL 20
-// #define TOUCH_GT911_SDA 19
-// #define TOUCH_GT911_INT -1
-// #define TOUCH_GT911_RST 38
-// #define TOUCH_GT911_ROTATION ROTATION_NORMAL
-// #define TOUCH_MAP_X1 480
-// #define TOUCH_MAP_X2 0
-// #define TOUCH_MAP_Y1 272
-// #define TOUCH_MAP_Y2 0
+/* uncomment for GT911 (correct for the Sunton 4.3" ESP32-4827S043 capacitive panel) */
+ #define TOUCH_GT911
+ #define TOUCH_GT911_SCL 20
+ #define TOUCH_GT911_SDA 19
+ #define TOUCH_GT911_INT -1
+ #define TOUCH_GT911_RST 38
+ #define TOUCH_GT911_ROTATION ROTATION_NORMAL
+ #define TOUCH_MAP_X1 480
+ #define TOUCH_MAP_X2 0
+ #define TOUCH_MAP_Y1 272
+ #define TOUCH_MAP_Y2 0
 
-/* uncomment for XPT2046 */
- #define TOUCH_XPT2046
- #define TOUCH_XPT2046_SCK 12
- #define TOUCH_XPT2046_MISO 13
- #define TOUCH_XPT2046_MOSI 11
- #define TOUCH_XPT2046_CS 38
- #define TOUCH_XPT2046_INT 18
- #define TOUCH_XPT2046_ROTATION 0
+/* uncomment for XPT2046 (resistive CYD boards; NOT the 4827S043) */
+// #define TOUCH_XPT2046
+// #define TOUCH_XPT2046_SCK 12
+// #define TOUCH_XPT2046_MISO 13
+// #define TOUCH_XPT2046_MOSI 11
+// #define TOUCH_XPT2046_CS 38
+// #define TOUCH_XPT2046_INT 18
+// #define TOUCH_XPT2046_ROTATION 0
 // 100-4000 => 11 - 407 (original)
 // 0-4100 => 33-363
 // 0-4500 => 63-400  (sharp pointer)
 // 500-4500 => 81-455
 // 500-5000 => 116 - 460
 // 0 - 5000 => 105 - 410
- #define TOUCH_MAP_X1 3800
- #define TOUCH_MAP_X2 300
- #define TOUCH_MAP_Y1 300
- #define TOUCH_MAP_Y2 3750
+// #define TOUCH_MAP_X1 3800
+// #define TOUCH_MAP_X2 300
+// #define TOUCH_MAP_Y1 300
+// #define TOUCH_MAP_Y2 3750
 
 int touch_last_x = 0, touch_last_y = 0;
 
