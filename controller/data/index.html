@@ -252,8 +252,10 @@
 
   // ---- helpers ----
   function isC() { return unit === 1; }
-  function toDisplayTemp(c) { return isC() ? c : (c * 9 / 5 + 32); }
+  function toDisplayTemp(c) { return isC() ? c : (c * 9 / 5 + 32); }         // native C -> display unit
+  function fromDisplayTemp(v) { return isC() ? v : (v - 32) * 5 / 9; }        // display unit -> native C
   function unitLabel() { return isC() ? "°C" : "°F"; }
+  function isTempControl(c) { return c && c.type === "sensor-based"; }
 
   function humanize(sec) {
     sec = Math.round(sec);
@@ -441,17 +443,27 @@
 
   // ---- schedule dialog ----
   var scheduleTarget = null;
+  function rangeText(c) {
+    if (isTempControl(c)) {
+      return "(" + Math.round(toDisplayTemp(c.min)) + "–" + Math.round(toDisplayTemp(c.max)) + unitLabel() + ")";
+    }
+    return "(" + c.min + "–" + c.max + ")";
+  }
   function openSchedule(name) {
     scheduleTarget = name;
     var c = statusByName[name] || {};
+    var isTemp = isTempControl(c);
     document.getElementById("scheduleTitle").textContent = "Schedule: " + name;
-    document.getElementById("onRange").textContent = "(" + c.min + "–" + c.max + ")";
-    document.getElementById("offRange").textContent = "(" + c.min + "–" + c.max + ")";
+    document.getElementById("onRange").textContent = rangeText(c);
+    document.getElementById("offRange").textContent = rangeText(c);
     fetch("/configureControl?control=" + encodeURIComponent(name))
       .then(function (r) { return r.json(); })
       .then(function (cfg) {
-        ["percentageOfDayOnTime","numberOfTimesToRun","normalValueOn","normalValueOff","overrideDefaultDurationSeconds"]
+        ["percentageOfDayOnTime","numberOfTimesToRun","overrideDefaultDurationSeconds"]
           .forEach(function (k) { document.getElementById(k).value = cfg[k]; });
+        // Temperatures are stored natively in Celsius; show them in the display unit.
+        document.getElementById("normalValueOn").value  = isTemp ? Math.round(toDisplayTemp(cfg.normalValueOn))  : cfg.normalValueOn;
+        document.getElementById("normalValueOff").value = isTemp ? Math.round(toDisplayTemp(cfg.normalValueOff)) : cfg.normalValueOff;
         updateScheduleHints();
         document.getElementById("scheduleDialog").showModal();
       })
@@ -468,18 +480,21 @@
   document.getElementById("numberOfTimesToRun").addEventListener("input", updateScheduleHints);
   document.getElementById("scheduleSave").addEventListener("click", function () {
     var c = statusByName[scheduleTarget] || {};
+    var isTemp = isTempControl(c);
     var data = { control: scheduleTarget };
     var ok = true;
-    ["percentageOfDayOnTime","numberOfTimesToRun","normalValueOn","normalValueOff","overrideDefaultDurationSeconds"]
-      .forEach(function (k) {
-        var el = document.getElementById(k);
-        data[k] = el.value;
-        if ((k === "normalValueOn" || k === "normalValueOff") &&
-            (Number(el.value) < c.min || Number(el.value) > c.max)) {
-          el.classList.add("invalid"); ok = false;
-        } else { el.classList.remove("invalid"); }
-      });
-    if (!ok) { toast("Value out of range (" + c.min + "–" + c.max + ")"); return; }
+    ["percentageOfDayOnTime","numberOfTimesToRun","overrideDefaultDurationSeconds"]
+      .forEach(function (k) { data[k] = document.getElementById(k).value; });
+    // Temperature fields are entered in the display unit; validate there, then
+    // convert back to native Celsius (the controller's storage unit).
+    ["normalValueOn","normalValueOff"].forEach(function (k) {
+      var el = document.getElementById(k);
+      var nativeVal = isTemp ? Math.round(fromDisplayTemp(Number(el.value))) : Number(el.value);
+      if (nativeVal < c.min || nativeVal > c.max) { el.classList.add("invalid"); ok = false; }
+      else { el.classList.remove("invalid"); }
+      data[k] = nativeVal;
+    });
+    if (!ok) { toast("Value out of range " + rangeText(c)); return; }
     post("/configureControl", data)
       .then(function () { document.getElementById("scheduleDialog").close(); refresh(); })
       .catch(function (e) { toast("Save failed"); });
