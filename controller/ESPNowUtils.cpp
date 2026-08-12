@@ -107,7 +107,10 @@ void ESPNowUtils::OnDataRecv(const esp_now_recv_info* info, const uint8_t *incom
                     pairingData.board_id = 0;       // 0 is server
                     // Server is in AP_STA mode: peers need to send data to server soft AP MAC address
                     WiFi.softAPmacAddress(pairingData.macAddr);
-//                    pairingData.channel = WiFi.channel();
+                    // Tell the peer our ACTUAL channel, not the channel it guessed in its
+                    // request. Otherwise the peer locks onto the wrong channel (e.g. it
+                    // scanned ch 7 while we are on ch 6) and can never hear us again.
+                    pairingData.channel = WiFi.channel();
                     Serial.println("send pairing response");
                     esp_err_t result = esp_now_send(mac_addr, (uint8_t *) &pairingData, sizeof(pairingData));
                     if (addPeer(mac_addr)) {
