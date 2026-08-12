@@ -3,6 +3,8 @@
 //#include <WebServer.h>
 #include <ESPmDNS.h>
 #include <ArduinoJson.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 
 #include "secrets.h"
 #include "web.h"
@@ -26,6 +28,11 @@ unsigned long  ntp_last_sync_success_time = 0;
 SpaStatus spaStatus;
 // Stores last time status was published on esp-now
 unsigned long previousStatusSendTime = 0;
+
+// Commands arrive on the ESP-NOW receive callback (WiFi task context). Rather than
+// mutate control state there — racing the main loop — we queue them and drain in loop().
+QueueHandle_t commandQueue;
+#define COMMAND_QUEUE_DEPTH 10
 
 void setDeviceTime(){
     static unsigned long lastPrint;
@@ -135,7 +142,7 @@ void setupWIFI() {
     // Connect to WiFi network
     if (app_preferences.isKey("wifi_ssid")) {
       WiFi.begin(app_preferences.getString("wifi_ssid"), app_preferences.getString("wifi_pass"));
-      Serial.printf("WiFi begin called, connecting to %s", app_preferences.getString("wifi_ssid"));
+      Serial.printf("WiFi begin called, connecting to %s", app_preferences.getString("wifi_ssid").c_str());
     } else {
       Serial.println("WiFi not configured yet, not starting.");
     }
@@ -175,6 +182,8 @@ void setup(void) {
         Serial.println("Unable to open preferences");
     }
 
+    commandQueue = xQueueCreate(COMMAND_QUEUE_DEPTH, sizeof(struct_command));
+
     setupNTP();
     setupSoftAP();
     setupWIFI();
@@ -206,18 +215,25 @@ void setup(void) {
         }
     });
     server.on("/override", HTTP_POST, []() {
-        const char *response = WEB_RESPONSE_OK;
         try {
             // seconds relative to current time
-            time_t start = now() + (time_t)server.arg("start").toInt();
-            time_t end   = now() + (time_t)server.arg("duration").toInt();
+            time_t start    = (time_t)server.arg("start").toInt();
+            time_t duration = (time_t)server.arg("duration").toInt();
             u_int8_t value = (u_int8_t)server.arg("value").toInt();
-            spaStatus.findByName(server.arg("control").c_str())->scheduleOverride(start, end, value);
+            spaStatus.findByName(server.arg("control").c_str())->applyUserValue(start, duration, value);
             previousStatusSendTime = 0; //update all others
             sendJSONResponse(WEB_RESPONSE_OK);
         } catch (std::invalid_argument &e) {
             sendJSONResponse(e.what(), 500);
         }
+    });
+    // Display/temperature unit is authoritative on the controller and pushed to the
+    // display over ESP-NOW. 0 = Fahrenheit, 1 = Celsius.
+    server.on("/tempUnit", HTTP_POST, []() {
+        u_int8_t unit = (u_int8_t)server.arg("unit").toInt() ? 1 : 0;
+        app_preferences.putUChar("temp_unit", unit);
+        previousStatusSendTime = 0; // push the new unit to peers promptly
+        sendJSONResponse(WEB_RESPONSE_OK);
     });
     server.on("/configureControl", HTTP_GET, []() {
         SpaControl *control = spaStatus.findByName(server.arg("control").c_str());
@@ -253,14 +269,23 @@ void setup(void) {
 }
 
 void loop(void) {
+    static unsigned long lastHttpReportTime = 0;
+
     setDeviceTime();
     server.handleClient();
+    processCommandQueue();
     spaStatus.loop();
     ESPNowUtils::loop();
     sendStatus();
     yield();
 //    sleep(5);
 
+#ifdef REPORT_SEND_FREQUENCY
+    if (WiFi.status() == WL_CONNECTED && (millis() - lastHttpReportTime) > REPORT_SEND_FREQUENCY) {
+      sendStatusViaHttp(REPORT_SEND_URL, spaStatus.statusString);
+      lastHttpReportTime = millis();
+    }
+#endif
     // reboot check
     if ((millis() - ntp_last_sync_success_time) > NTP_SYNC_FAIL_REBOOT_INTERVAL) {
         Serial.printf("We have not seen an NTP update in over %d, assuming network broke, rebooting", NTP_SYNC_FAIL_REBOOT_INTERVAL);
@@ -280,8 +305,9 @@ void sendStatus() {
 
         ESPNowUtils::outgoingStatusServer.time = mktime(main_device_time);
         ESPNowUtils::outgoingStatusServer.tz_offset = timezone_offset;
-        // TODO: move this to a dynamic thing of some sort
-        ESPNowUtils::outgoingStatusServer.water_temp = spaStatus.temperatureUtils.getTempF(0);
+        // Native unit is Celsius; the display converts for presentation.
+        ESPNowUtils::outgoingStatusServer.water_temp = spaStatus.temperatureUtils.getTempC(0);
+        ESPNowUtils::outgoingStatusServer.temp_unit = app_preferences.getUChar("temp_unit", 1);
         ESPNowUtils::outgoingStatusServer.control_count = spaStatus.controls.size();
         ESPNowUtils::outgoingStatusServer.touchscreen_timeout = 300;
 
@@ -312,7 +338,8 @@ void sendStatus() {
 }
 
 /**
- * Handle incoming commands received via ESP-NOW
+ * Handle incoming commands received via ESP-NOW.
+ * Runs in the WiFi task context, so we only enqueue here and apply from loop().
  * @param command
  */
 void espnowCommandReceived(struct_command *command) {
@@ -321,13 +348,33 @@ void espnowCommandReceived(struct_command *command) {
     Serial.print(" end=");Serial.print(command->end);
     Serial.println();
 
-    previousStatusSendTime = 0; // update others
-    spaStatus.controls[command->control_id]->scheduleOverride(
-            now() + command->start,
-            now() + command->end,
-            command->value
-    );
+    if (commandQueue != NULL) {
+        xQueueSend(commandQueue, command, 0); // copies the struct; drop if queue is full
+    }
+}
 
+/**
+ * Drain and apply any commands queued by the ESP-NOW receive callback.
+ * Runs on the main loop, so it is safe to mutate control state here.
+ */
+void processCommandQueue() {
+    struct_command command;
+    while (commandQueue != NULL && xQueueReceive(commandQueue, &command, 0) == pdTRUE) {
+        if (command.control_id >= spaStatus.controls.size()) {
+            Serial.printf("Ignoring command for out-of-range control_id %d\n", command.control_id);
+            continue;
+        }
+        previousStatusSendTime = 0; // update others
+        try {
+            spaStatus.controls[command.control_id]->applyUserValue(
+                    command.start,
+                    command.end,
+                    command.value
+            );
+        } catch (std::invalid_argument &e) {
+            Serial.printf("Rejected command for control %d: %s\n", command.control_id, e.what());
+        }
+    }
 }
 
 

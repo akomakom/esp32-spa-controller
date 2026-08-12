@@ -215,6 +215,18 @@ public:
     virtual void toggle();
 
     /**
+     * Apply a value requested by a user (web or display).
+     * @param relStart seconds from now the value should take effect
+     * @param relEnd   seconds from now the value should stop
+     * @param value    the requested value
+     *
+     * Base behaviour is a temporary override that reverts to the normal schedule.
+     * SensorBasedControl overrides this to change the persistent setpoint instead,
+     * so a heater temperature survives the override window and reboots.
+     */
+    virtual void applyUserValue(time_t relStart, time_t relEnd, u_int8_t value);
+
+    /**
      *  This is the input value, eg on/off (1/0) or "100" for temperature.
      *  It can vary by scheduler/override
      * @return either this->value or this->scheduler value if scheduler is in effect
@@ -286,6 +298,11 @@ public:
     virtual void applyOutputs();
     virtual u_int8_t getOnState();
     virtual u_int8_t getOnStateForDependents();
+
+    // A sensor-based setpoint is persistent: it becomes the "on" value of the normal
+    // schedule and is saved to NVS, rather than a temporary override.
+    virtual void applyUserValue(time_t relStart, time_t relEnd, u_int8_t value);
+    void setSetpoint(u_int8_t value);
 
     u_int8_t pin;
     u_int8_t sensorIndex;

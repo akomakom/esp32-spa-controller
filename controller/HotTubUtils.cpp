@@ -52,6 +52,7 @@ SpaControl *SpaControlDependencies::getDependentControl() {
     } else if (neededByOtherControl != NULL) {
         return neededByOtherControl;
     }
+    return NULL; // no dependency configured
 }
 
 
@@ -94,6 +95,12 @@ void SpaControlScheduler::load(const char* eepromKey) {
         // apply so that math can be precalculated
         Serial.print("Retrieved values from eeprom, eg: ");
         Serial.println(normalSettings.percentageOfDayOnTime);
+        // Clamp persisted values into the current [min,max] range before applying.
+        // Ranges can change between firmware versions (e.g. the F->C switch dropped the
+        // heater ceiling from 104 to 40); without this, normalSchedule()'s checkBounds()
+        // would throw on boot and abort.
+        normalSettings.normalValueOn  = std::min(max, std::max(min, normalSettings.normalValueOn));
+        normalSettings.normalValueOff = std::min(max, std::max(min, normalSettings.normalValueOff));
         // apply the settings to precalculate other non-persisted variables
         normalSchedule(normalSettings.percentageOfDayOnTime, normalSettings.numberOfTimesToRun, normalSettings.normalValueOn, normalSettings.normalValueOff);
     }
@@ -107,7 +114,11 @@ void SpaControlScheduler::scheduleOverride(time_t startTime, time_t endTime, u_i
 }
 
 void SpaControlScheduler::cancelOverride() {
-    scheduleOverride(now(), now(), SCHEDULER_DISABLED_VALUE);
+    // Set directly rather than via scheduleOverride(): the disabled sentinel is
+    // intentionally out of [min,max] and would be rejected by checkBounds().
+    this->overrideStartTime = now();
+    this->overrideEndTime = now();
+    this->overrideValue = SCHEDULER_DISABLED_VALUE;
 }
 
 void SpaControlScheduler::checkBounds(u_int8_t value) {
@@ -189,6 +200,11 @@ void SpaControl::toggle() {
             getNextValue());
 //    Serial.println("PARENT!!! Value after toggle is ");
 //    Serial.println(getEffectiveValue());
+}
+
+void SpaControl::applyUserValue(time_t relStart, time_t relEnd, u_int8_t value) {
+    // Default: a temporary override that reverts to the normal schedule afterwards.
+    scheduleOverride(now() + relStart, now() + relEnd, value);
 }
 
 u_int8_t SpaControl::getEffectiveValue() {
@@ -282,9 +298,9 @@ void TwoSpeedSpaControl::applyOutputs() {
 SensorBasedControl::SensorBasedControl(const char *name, u_int8_t pin, u_int8_t sensorIndex, u_int8_t swing, time_t postShutdownOnTime, TemperatureUtils* temps) : SpaControl(name, "sensor-based") {
     this->pin = pin;
     this->sensorIndex = sensorIndex;
-    // Default limits:
-    this->min = 0; // using Fahrenheit because there is better resolution with integers
-    this->max = 104;
+    // Default limits (native unit is Celsius):
+    this->min = 0;
+    this->max = 40; // ~104F, a safe hot-tub ceiling
     this->swing = swing;
     this->postShutdownOnTime = postShutdownOnTime;
     this->temperatureUtils = temps;
@@ -305,7 +321,7 @@ u_int8_t SensorBasedControl::getOnState() {
 
     // Delta to where we want to be, positive is too hot, negative is too cold:
     u_int8_t effectiveValue = getEffectiveValue();
-    float delta = temperatureUtils->getTempF(this->sensorIndex) - (float)effectiveValue;
+    float delta = temperatureUtils->getTempC(this->sensorIndex) - (float)effectiveValue;
     if (effectiveValue == max && delta >= 0) {
         // We must never exceed max, this is a safety feature.
         // An appliance may not be capable of going any higher and will be stuck ON forever
@@ -344,6 +360,24 @@ void SensorBasedControl::applyOutputs() {
     digitalWrite(pin, getOnState());
 }
 
+void SensorBasedControl::setSetpoint(u_int8_t value) {
+    // The setpoint is the "on" value of the normal schedule. Persist it so it
+    // survives the override window and reboots.
+    value = std::min(max, std::max(min, value));
+    normalSchedule(normalSettings.percentageOfDayOnTime,
+                   normalSettings.numberOfTimesToRun,
+                   value,
+                   normalSettings.normalValueOff);
+    // Clear any lingering override so the new persistent setpoint takes effect now.
+    cancelOverride();
+    persist();
+}
+
+void SensorBasedControl::applyUserValue(time_t relStart, time_t relEnd, u_int8_t value) {
+    // Ignore the time window: a sensor setpoint is persistent, not a timed override.
+    setSetpoint(value);
+}
+
 
 /*** SpaStatus ***/
 
@@ -368,7 +402,9 @@ void SpaStatus::updateStatusString() {
         }
     }
 
-    jsonStatusMetrics["temp"] = temperatureUtils.getTempF(0);
+    // Native unit is Celsius; the web UI converts for display per "temp_unit".
+    jsonStatusMetrics["temp"] = temperatureUtils.getTempC(0);
+    jsonStatusMetrics["temp_unit"] = app_preferences.getUChar("temp_unit", 1);
     jsonStatusMetrics["time"] = mktime(main_device_time);
     jsonStatusMetrics["uptime"] = esp_timer_get_time() / 1000000;
     serializeJson(jsonStatus, statusString);
@@ -390,17 +426,23 @@ SpaControl *SpaStatus::findByName(const char *name) {
 
 void SpaStatus::setup() {
 
-    // Defaults until UI configures these values:
+    // Defaults until UI configures these values (native unit is Celsius):
     pump->normalSchedule(50, 2, 1, 0);
-    // always on, set to max temp, keep above freezing when scheduled to be off from UI
-    heater->normalSchedule(100, 1, heater->max, std::max(heater->min, (u_int8_t)40)); pump->neededBy(heater, 1, 1);
+    // Always on; heat to a sane default setpoint (38C ~ 100F), keep above freezing
+    // (4C) when scheduled off. The setpoint is persistent and editable from the UI.
+    heater->normalSchedule(100, 1, 38, std::max(heater->min, (u_int8_t)4)); pump->neededBy(heater, 1, 1);
     ozone->lockedTo(pump, SpaControlDependencies::SPECIAL_VALUE_ANY_GREATER_THAN_ZERO, 1);
 
     Serial.println("About to iterate and load settings");
     // apply saved preferences
     // JSON init
     for (SpaControl *control: controls) {
-        control->load();
+        try {
+            control->load();
+        } catch (std::exception &e) {
+            // Corrupt or out-of-range persisted settings must not brick the controller.
+            Serial.printf("Failed to load settings for %s (%s), keeping defaults\n", control->name, e.what());
+        }
         control->jsonStatus = jsonStatusControls.createNestedObject();
     }
     temperatureUtils.setup();

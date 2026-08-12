@@ -2,6 +2,7 @@
 #define __WEB_H__
 
 #include <WebServer.h>
+#include <HTTPClient.h>
 #include <Update.h>
 #include <SPIFFS.h>
 
@@ -22,7 +23,11 @@ extern void sendHTMLResponse(const char *content);
 
 extern void setupServerDefaultActions();
 
+void sendStatusViaHttp(char* serverUrl, char* statusString);
+
 extern WebServer server;
+
+extern HTTPClient httpClient;
 
 
 #endif

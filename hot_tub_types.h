@@ -32,6 +32,7 @@ typedef struct struct_status_server {
     char server_name[20] = "Hot Tub";
     u_int8_t control_count = 0;
     u_int16_t touchscreen_timeout = 0; // 0 is never
+    u_int8_t temp_unit = 1; // display unit only: 0 = Fahrenheit, 1 = Celsius. Native storage is always Celsius.
 } struct_status_server;
 
 typedef struct struct_status_control {

@@ -2,6 +2,11 @@
 *.bin
 *.map
 *.elf
+# PlatformIO
+.pio/
+# Display serial logs (local scratch)
+display/log
+display/log2
 /controller/hot_tub_types.h
 /controller/secrets.h
 /display/hot_tub_types.h

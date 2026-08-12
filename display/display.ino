@@ -18,8 +18,8 @@
 
 #ifdef GRAPHICS_ENABLE
 
-const char * MODE_MAPPING[] = { "OFF", "ON", "HIGH" };
-
+const char *        MODE_MAPPING[] = { "OFF", "ON", "HIGH" };
+const lv_palette_t  MODE_COLORS[]  = { LV_PALETTE_BLUE, LV_PALETTE_RED, LV_PALETTE_ORANGE };
 
 // Store timestamps to check which task is stuck
 #define WATCHDOG_TIMEOUT 1  // Timeout in seconds
@@ -455,12 +455,25 @@ void loop()
     }
 }
 
+// The controller stores/sends temperatures in Celsius and pushes the desired
+// display unit (0=F, 1=C) in the server status. Convert at presentation time only.
+bool displayInCelsius() {
+    return lastServerStatus == NULL || lastServerStatus->temp_unit != 0;
+}
+float toDisplayTemp(float celsius) {
+    return displayInCelsius() ? celsius : (celsius * 9.0f / 5.0f + 32.0f);
+}
+char displayUnitChar() {
+    return displayInCelsius() ? 'C' : 'F';
+}
+
 void updateStatusBar(unsigned long frequency) {
     static unsigned long last_update = 0;
     if ((millis() - last_update) > frequency) {
       last_update = millis();
 
-      lv_label_set_text_fmt(bannerLabel, "%s @%.1fF ", lastServerStatus->server_name, lastServerStatus->water_temp);
+      lv_label_set_text_fmt(bannerLabel, "%s @%.1f%c ", lastServerStatus->server_name,
+                            toDisplayTemp(lastServerStatus->water_temp), displayUnitChar());
 
       lv_label_set_text_fmt(
               timeLabel,
@@ -611,13 +624,11 @@ void updateButtons(unsigned long frequency) {
           lv_obj_add_flag(labelORT, LV_OBJ_FLAG_HIDDEN);
         }
 
-        if (status->e_value) {
-//              lv_led_on(led);
-            lv_obj_set_style_border_color(btn, lv_palette_main(LV_PALETTE_RED), LV_PART_MAIN | LV_STATE_DEFAULT);
-        } else {
-//              lv_led_off(led);
-            lv_obj_set_style_border_color(btn, lv_palette_main(LV_PALETTE_BLUE), LV_PART_MAIN | LV_STATE_DEFAULT);
-        }
+        lv_obj_set_style_border_color(
+          btn,
+          lv_palette_main(MODE_COLORS[status->e_value]),
+          LV_PART_MAIN | LV_STATE_DEFAULT
+        );
         //TRACE("Update Buttons 5.2");
 
 
@@ -635,10 +646,10 @@ void updateButtons(unsigned long frequency) {
         }
 //            TRACE("Update Buttons 5.5");
 //              lv_led_set_color(led, lv_palette_main(status->e_value == 1 ? LV_PALETTE_RED : LV_PALETTE_YELLOW));
-        lv_obj_set_style_border_color(btn, lv_palette_main(status->e_value == 1 ? LV_PALETTE_RED : LV_PALETTE_ORANGE), LV_PART_MAIN | LV_STATE_DEFAULT);
+
       } else if (strcmp(status->type, "sensor-based") == 0) {
 //              lv_label_set_text_fmt(label, "%s (%d)", status->name, status->value);
-        lv_label_set_text_fmt(labelValue, "%dF", status->value);
+        lv_label_set_text_fmt(labelValue, "%.0f%c", toDisplayTemp((float)status->value), displayUnitChar());
       } else {
         lv_label_set_text(label, status->name);
       }
@@ -693,7 +704,7 @@ static void btn_event_cb(lv_event_t * e)
             TRACE("SENS DISP 2");
 //            lv_spinbox_set_range(sensorBasedControlSetpointLabel, status->min, status->max);
 //            lv_spinbox_set_value(sensorBasedControlSetpointLabel, status->value);
-            lv_label_set_text_fmt(sensorBasedControlSetpointLabel, "%d", status->value);
+            lv_label_set_text_fmt(sensorBasedControlSetpointLabel, "%.0f%c", toDisplayTemp((float)status->value), displayUnitChar());
             TRACE("SENS DISP 2.1");
             lv_label_set_text_fmt(sensorBasedControlDescription, "Adjust setpoint for %s", status->name);
             TRACE("SENS DISP 3");
@@ -728,7 +739,7 @@ static void lv_spinbox_event_cb(lv_event_t * e)
                 }
                 break;
         }
-        lv_label_set_text_fmt(sensorBasedControlSetpointLabel, "%d", sensorBasedControlSetpointValue);
+        lv_label_set_text_fmt(sensorBasedControlSetpointLabel, "%.0f%c", toDisplayTemp((float)sensorBasedControlSetpointValue), displayUnitChar());
     }
     TRACE("SENS CB 3");
 
@@ -739,8 +750,8 @@ static void lv_spinbox_event_cb(lv_event_t * e)
             // this is a confirm
             TRACE("SENS CB 3.1");
             TRACE("SENS CB 3.2");
-            showStatusMessage("Set %s to %d for %d minutes", status->name, sensorBasedControlSetpointValue,
-                              status->DO / 60);
+            showStatusMessage("Set %s to %.0f%c", status->name,
+                              toDisplayTemp((float)sensorBasedControlSetpointValue), displayUnitChar());
             TRACE("SENS CB 3.3");
             ESPNowUtils::sendOverrideCommand(
                     status->control_id,

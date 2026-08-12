@@ -1,6 +1,24 @@
 #include "core.h"
 #include "web.h"
+#include "secrets.h"
 
+// Credentials for firmware / filesystem / WiFi endpoints. Override in secrets.h.
+#ifndef OTA_AUTH_USER
+#define OTA_AUTH_USER "admin"
+#endif
+#ifndef OTA_AUTH_PASS
+#define OTA_AUTH_PASS "admin"
+#endif
+
+// Gate sensitive endpoints behind HTTP Basic auth. Returns false (and sends a 401)
+// when the request is not authenticated, so callers can simply `if (!requireAuth()) return;`.
+bool requireAuth() {
+    if (!server.authenticate(OTA_AUTH_USER, OTA_AUTH_PASS)) {
+        server.requestAuthentication();
+        return false;
+    }
+    return true;
+}
 
 const char *WEB_RESPONSE_OK = R"({ "success": true })";
 const char *WEB_RESPONSE_FAIL = R"({ "success": false })";
@@ -148,6 +166,7 @@ bool handleFileRead(String path){
 
 void handleFileUpload(){
     if(server.uri() != "/edit") return;
+    if(!server.authenticate(OTA_AUTH_USER, OTA_AUTH_PASS)) return;
     HTTPUpload& upload = server.upload();
     if(upload.status == UPLOAD_FILE_START){
         String filename = upload.filename;
@@ -273,17 +292,23 @@ void listDir(fs::FS &fs, const char * dirname, uint8_t levels) {
 
 void setupServerDefaultActions() {
     server.on("/serverIndex", HTTP_GET, []() {
+        if (!requireAuth()) return;
         sendHTMLResponse(WEBPAGE_UPDATE);
     });
     server.on("/update", HTTP_GET, []() {
-        sendHTMLResponse(WEBPAGE_LOGIN);
+        if (!requireAuth()) return;
+        sendHTMLResponse(WEBPAGE_UPDATE);
     });
     /*handling uploading firmware file */
     server.on("/update", HTTP_POST, []() {
+        if (!requireAuth()) return;
         server.sendHeader("Connection", "close");
         server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
         ESP.restart();
     }, []() {
+        // Runs while the request body streams in, before the completion handler above.
+        // Refuse to touch flash unless authenticated.
+        if (!server.authenticate(OTA_AUTH_USER, OTA_AUTH_PASS)) return;
         HTTPUpload &upload = server.upload();
         if (upload.status == UPLOAD_FILE_START) {
             Serial.printf("Update: %s\n", upload.filename.c_str());
@@ -306,24 +331,29 @@ void setupServerDefaultActions() {
 
     //load editor
     server.on("/edit", HTTP_GET, [](){
+        if (!requireAuth()) return;
         if(!handleFileRead("/edit.htm")) server.send(404, "text/plain", "FileNotFound");
     });
     //create file
-    server.on("/edit", HTTP_PUT, handleFileCreate);
+    server.on("/edit", HTTP_PUT, [](){ if (!requireAuth()) return; handleFileCreate(); });
     //delete file
-    server.on("/edit", HTTP_DELETE, handleFileDelete);
+    server.on("/edit", HTTP_DELETE, [](){ if (!requireAuth()) return; handleFileDelete(); });
     //first callback is called after the request has ended with all parsed arguments
     //second callback handles file uploads at that location
-    server.on("/edit", HTTP_POST, [](){ server.send(200, "text/plain", ""); }, handleFileUpload);
+    server.on("/edit", HTTP_POST, [](){
+        if (!requireAuth()) return;
+        server.send(200, "text/plain", "");
+    }, handleFileUpload);
 
 
-    server.on("/list", HTTP_GET, handleFileList);
+    server.on("/list", HTTP_GET, [](){ if (!requireAuth()) return; handleFileList(); });
 
     server.on("/configureWifi", HTTP_POST, []() {
-      Serial.printf("Configuring WiFi to %s/%s", server.arg("wifi_ssid"),server.arg("wifi_pass"));
+      if (!requireAuth()) return;
+      Serial.printf("Configuring WiFi to %s/%s", server.arg("wifi_ssid").c_str(), server.arg("wifi_pass").c_str());
       app_preferences.putString("wifi_ssid", server.arg("wifi_ssid").c_str());
       app_preferences.putString("wifi_pass", server.arg("wifi_pass").c_str());
-      Serial.printf("WIFI Configuration set to %s/%s, restarting", app_preferences.getString("wifi_ssid"), app_preferences.getString("wifi_pass"));
+      Serial.printf("WIFI Configuration set to %s/%s, restarting", app_preferences.getString("wifi_ssid").c_str(), app_preferences.getString("wifi_pass").c_str());
       ESP.restart();
     });
 
@@ -336,6 +366,25 @@ void setupServerDefaultActions() {
 }
 
 
+void sendStatusViaHttp(char* serverUrl, char* statusString) {
+
+      httpClient.begin(serverUrl);  // HTTPS handled automatically
+      httpClient.addHeader("Content-Type", "application/json");  // Specify JSON format
+
+      // Send POST request
+      int httpResponseCode = httpClient.POST(statusString);
+
+      if (httpResponseCode > 0) {
+          Serial.printf("HTTP Response code: %d\n", httpResponseCode);
+          String response = httpClient.getString();
+          Serial.println("Server response: " + response);
+      } else {
+          Serial.printf("HTTP POST failed: %s\n", httpClient.errorToString(httpResponseCode).c_str());
+      }
+
+      httpClient.end();  // Free resources
+}
 
 
 WebServer server(80);
+HTTPClient httpClient;

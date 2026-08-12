@@ -2,581 +2,550 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Control</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#0b1622">
+  <title>Spa Control</title>
   <style>
-    .error {
-      color: red;
+    :root {
+      --bg: #0b1622;
+      --panel: #16232f;
+      --panel-2: #1e2f3d;
+      --line: #2b3f50;
+      --text: #e8f1f8;
+      --muted: #8fa6b6;
+      --accent: #33bdef;
+      --on: #ff4d4d;
+      --low: #ffb020;
+      --high: #ff7043;
+      --dep: #ffd54a;
+      --ok: #3ddc84;
+      --shadow: 0 2px 8px rgba(0,0,0,.35);
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      padding: 12px; padding-bottom: 40px;
     }
 
-    #configbutton {
-      position: absolute;
-      right: 5px;
-      bottom: 5px;
-      font-size: x-large;
+    /* ---- top status bar ---- */
+    #topbar {
+      display: grid; grid-template-columns: repeat(3, 1fr) auto; gap: 10px;
+      align-items: stretch; margin-bottom: 16px;
     }
-    #systemconfigdialog {
-      display: none;
+    .metric {
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: var(--radius); padding: 10px 14px; text-align: center;
+      box-shadow: var(--shadow);
     }
-
-    .spacontrol {
-      box-shadow: 1px 1px 4px 1px #8dcbe6;
-      background: linear-gradient(to bottom, #33bdef 5%, #019ad2 100%);
-      background-color: #33bdef;
-      border-radius: 9px;
-      border: 3px solid #057fd0;
-      display: inline-block;
-      cursor: pointer;
-      color: #ffffff;
-      font-family: Arial;
-      font-size: x-large;
-      font-weight: bold;
-      padding: 15px 51px;
-      text-decoration: none;
-      text-shadow: 0px -1px 0px #5b6178;
-      position: relative;
+    .metric .label { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .05em; }
+    .metric .value { font-size: clamp(22px, 6vw, 38px); font-weight: 700; line-height: 1.1; margin-top: 4px; }
+    .metric .sub { color: var(--muted); font-size: 12px; }
+    #settingsBtn {
+      background: var(--panel); border: 1px solid var(--line); color: var(--text);
+      border-radius: var(--radius); font-size: 24px; padding: 0 18px; cursor: pointer;
+      box-shadow: var(--shadow);
     }
+    #settingsBtn:active { background: var(--panel-2); }
 
-    .spacontrol .control-name {
-      text-transform: capitalize;
-      text-align: center;
-      font-size: 70px;
+    /* ---- controls grid ---- */
+    #controls {
+      display: grid; gap: 14px;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     }
-
-    button {
-      font-size: xxx-large;
+    .card {
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow);
+      display: flex; flex-direction: column; gap: 12px; position: relative;
     }
-    button.duration-option {
-      font-size: xxx-large!important; /** override jquery-ui **/
-      margin: 5px;
-      box-shadow: 3px 3px 4px;
+    .card.is-on { border-color: var(--on); }
+    .card-head { display: flex; align-items: center; justify-content: space-between; }
+    .card-name { font-size: 20px; font-weight: 700; text-transform: capitalize; }
+    .card-icons { display: flex; align-items: center; gap: 8px; }
+    .dot { width: 14px; height: 14px; border-radius: 50%; background: #3a4d5e; display: inline-block; }
+    .dot.on { background: var(--on); box-shadow: 0 0 10px var(--on); }
+    .dot.dep { background: var(--dep); box-shadow: 0 0 10px var(--dep); }
+    .iconbtn {
+      background: none; border: none; color: var(--muted); font-size: 20px;
+      cursor: pointer; padding: 4px; line-height: 1;
     }
-    button.scheduler {
-      font-size: large;
+    .iconbtn:active { color: var(--text); }
+    .badge {
+      font-size: 12px; color: var(--low); border: 1px solid var(--low);
+      border-radius: 20px; padding: 2px 8px; cursor: pointer; white-space: nowrap;
     }
+    .dep-flag { color: var(--dep); font-size: 15px; }
 
-    button.control-incremental {
-      display: none;
+    /* main action row */
+    .action { display: flex; align-items: center; gap: 10px; }
+    .state-btn {
+      flex: 1; border: none; border-radius: 12px; cursor: pointer;
+      background: var(--panel-2); color: var(--text);
+      font-size: 30px; font-weight: 800; padding: 18px 10px; letter-spacing: .04em;
+      transition: background .12s;
     }
-
-    .sensor-based button.control-incremental {
-      display: initial;
+    .state-btn.on { background: linear-gradient(180deg, #ff6b6b, #e23b3b); }
+    .state-btn.low { background: linear-gradient(180deg, #ffc659, #f5a623); color: #222; }
+    .state-btn.high { background: linear-gradient(180deg, #ff8a5c, #ff5722); }
+    .state-btn:active { filter: brightness(1.08); }
+    .step-btn {
+      width: 64px; height: 64px; border-radius: 12px; border: 1px solid var(--line);
+      background: var(--panel-2); color: var(--text); font-size: 34px; cursor: pointer;
     }
-
-
-
-    .spacontrol:hover {
-      background: linear-gradient(to bottom, #019ad2 5%, #33bdef 100%);
-      background-color: #019ad2;
+    .step-btn:active { background: var(--accent); color: #04222f; }
+    .setpoint {
+      flex: 1; text-align: center; font-size: 40px; font-weight: 800;
     }
+    .setpoint small { display: block; font-size: 13px; color: var(--muted); font-weight: 500; }
+    .card.error { outline: 2px solid #ff5252; }
 
-    .spacontrol:active {
-      position: relative;
-      top: 1px;
+    /* ---- dialogs ---- */
+    dialog {
+      border: 1px solid var(--line); background: var(--panel); color: var(--text);
+      border-radius: var(--radius); padding: 0; width: min(440px, 92vw); box-shadow: 0 12px 40px rgba(0,0,0,.6);
     }
-
-    .scheduler {
-      border: 1px solid grey;
+    dialog::backdrop { background: rgba(0,0,0,.55); }
+    .dlg-head { font-size: 20px; font-weight: 700; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+    .dlg-body { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+    .dlg-foot { padding: 14px 18px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 10px; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label { color: var(--muted); font-size: 14px; }
+    .field .hint { color: var(--accent); font-size: 12px; }
+    input[type=text], input[type=password], input[type=number] {
+      background: var(--bg); border: 1px solid var(--line); color: var(--text);
+      border-radius: 8px; padding: 12px; font-size: 17px; width: 100%;
     }
-
-    .dialog-template {
-      display: none;
+    input.invalid { border-color: #ff5252; }
+    .btn {
+      border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+      border-radius: 10px; padding: 12px 18px; font-size: 16px; cursor: pointer;
     }
-    .spacontrol .top-right-icons {
-      position: absolute;
-      top: 1px;
-      right: 1px;
+    .btn.primary { background: var(--accent); color: #04222f; border-color: var(--accent); font-weight: 700; }
+    .btn:active { filter: brightness(1.1); }
+    .seg { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    .seg button { flex: 1; background: var(--panel-2); color: var(--text); border: none; padding: 12px; font-size: 16px; cursor: pointer; }
+    .seg button.sel { background: var(--accent); color: #04222f; font-weight: 700; }
+    #durationGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    #durationGrid button {
+      background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
+      border-radius: 10px; padding: 14px 6px; font-size: 15px; cursor: pointer;
     }
-
-    .spacontrol .control-power-state {
-      font-size: 20px;
+    #durationGrid button:active { background: var(--accent); color: #04222f; }
+    .note { color: var(--muted); font-size: 13px; }
+    #toast {
+      position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
+      background: #04222f; border: 1px solid var(--accent); color: var(--text);
+      padding: 10px 16px; border-radius: 10px; font-size: 14px; opacity: 0;
+      transition: opacity .2s; pointer-events: none; max-width: 90vw;
     }
-
-
-    #spastatus {
-      /*width: 1920px;*/
-      /*height: 1080px;*/
-      /*min-height: 200px;*/
-      position: relative;
-      /*background: #191919;*/
-      display: flex;
-      margin-bottom: 10px;
-    }
-
-    #spastatus .metric-widget {
-      /*position: absolute;*/
-      border-radius: 4px;
-      overflow: hidden;
-      box-sizing: border-box;
-      border: 10px solid #191919;
-      padding: 15px;
-      text-align: center;
-      background: #31343B;
-      color: #fff;
-    }
-    #spastatus .metric-widget .label {  color: #a6a6a6; }
-
-    #spastatus .title, #spastatus .value { margin-bottom: 12px; text-transform: uppercase; }
-    #spastatus .title { font-size: 30px; font-weight: 400; }
-    #spastatus .value { font-size: 80px; font-weight: 700;}
-    #spastatus .label { font-size: 30px; text-transform: uppercase; font-weight: 400;}
-
-
+    #toast.show { opacity: 1; }
   </style>
-  <script src="jquery.min.js"></script><!-- https://ajax.googleapis.com/ajax/libs/jquery/3.7.0/jquery.min.js -->
-  <link rel="stylesheet" href="jquery-ui.css"><!-- https://ajax.googleapis.com/ajax/libs/jqueryui/1.13.2/themes/smoothness/jquery-ui.css -->
-  <script src="jquery-ui.min.js"></script><!-- https://ajax.googleapis.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js -->
-  <script src="humanize-duration.min.js"></script><!-- https://cdnjs.cloudflare.com/ajax/libs/humanize-duration/3.29.0/humanize-duration.min.js -->
-  <script>
-
-    $(document).ready(function() {
-
-      //TODO: get all this from server
-      let durationOptions = [0,1,2,3,4,5,10,15,20,30,45,60,120,240,480,720,1440,2880,4320,7200,10080,20160,43200,86400]
-
-      // saved state for override duration edit dialog:
-      let durationChoice = 20;
-      let controlName = '';
-      let controlValue = 0;
-      let durationDialog;
-
-      $('#configbutton').click(function () {
-        let dialog = $( "#systemconfigdialog" ).dialog({
-          title: `Configure WiFi`,
-//                  autoOpen: false,
-          height:'auto', width:'auto',
-          modal: true,
-          buttons: {
-            'Save': function () {
-              let data = {
-                wifi_ssid: $('input[name="wifi_ssid"]').val(),
-                wifi_pass: $('input[name="wifi_pass"]').val()
-              }
-              $.ajax({
-                type: "POST",
-                url: '/configureWifi',
-                data: data,
-                success: function() {
-                  dialog.dialog('close');
-                },
-                error: function (e) {
-                  status.text(e.statusText);
-                },
-                dataType: 'json'
-              });
-            },
-            'Cancel': function() {
-              $(this).dialog('close');
-            }
-          },
-
-          close: function() {
-
-          }
-        });
-
-      });
-
-      $.each(durationOptions, function(index, duration) {
-        let option = $('<button type="button" class="duration-option"/>');
-        option.text(duration == 0 ? "End Now" : humanizeDuration(duration*60000, {largest: 1, round: true}))
-                .attr('value', duration)
-                .on('click', function() {
-                  durationChoice = duration;
-                  setOverrideClickHandler(
-                          controlName,
-                          durationChoice,
-                          controlValue,
-                          function() {
-                            $(this).removeClass('error');
-                            updateStatus();
-                            durationDialog.dialog('close');
-                          },
-                          function () {
-                            $(this).addClass('error')
-                          }
-                  );
-
-                });
-        $('#duration-options').append(option);
-      });
-
-      let validate = function(input, min, max) {
-        if (input.val() >= min && input.val() <= max) {
-          input.removeClass('error');
-        } else {
-          input.addClass('error');
-        }
-      }
-
-      let configControlHandler = function(event) {
-        controlName = $(this).parents('.spacontrol').attr('name');
-        let controlData = $(this).parents('.spacontrol').data('status');
-        event.stopPropagation();
-
-        $.getJSON( "configureControl?control=" + controlName, function( data ) {
-
-
-          $("#control-config-dialog-form").find('input').each(function(index, input) {
-            // assign input field values by matching ids to json property names
-            $(input).val(data[$(input).attr('id')]);
-          });
-          $('#percentageOfDayOnTime').on('change keyup paste', function() {
-            $('#percentageOfDayOnTimeHours').val(
-                    humanizeDuration(
-                            $(this).val() * 24 * 3600000 / 100,
-                            {largest: 2, round: false}
-                    )
-            );
-            $('#numberOfTimesToRun').trigger('change'); //update hours per period
-          }).trigger('change');
-          $('#numberOfTimesToRun').on('change keyup paste', function() {
-            $('#numberOfTimesToRunHours').val(humanizeDuration(
-                    $('#percentageOfDayOnTime').val() * 24 * 3600000 / 100 / $(this).val(),
-                    {largest: 2, round: true}
-            ));
-          }).trigger('change');
-
-
-          $("#control-config-dialog-form").find('input.validate-min-max')
-                  .attr('min', controlData['min'])
-                  .attr('max', controlData['max'])
-                  .on('change keyup paste', function() {
-                    validate($(this), controlData['min'], controlData['max']);
-                  });
-
-          $("#control-config-dialog-form").find('.min').text(controlData['min']);
-          $("#control-config-dialog-form").find('.max').text(controlData['max']);
-
-          let status = $( "#control-config-dialog-form .status" );
-
-          let dialog = $( "#control-config-dialog-form" ).dialog({
-            title: `Configure Schedule for ${controlName}`,
-//                  autoOpen: false,
-            height:'auto', width:'auto',
-            modal: true,
-            buttons: {
-              'Save': function () {
-
-                status.text('');
-                let data = {control: controlName};
-                $("#control-config-dialog-form").find('input').each(function(index, input) {
-                  data[$(input).attr('id')] = $(input).val();
-                });
-
-                $.ajax({
-                  type: "POST",
-                  url: '/configureControl',
-                  data: data,
-                  success: function() {
-                    updateStatus();
-                    dialog.dialog('close');
-                  },
-                  error: function (e) {
-                    status.text(e.statusText);
-                  },
-                  dataType: 'json'
-                });
-              },
-              'Cancel': function() {
-                $(this).dialog('close');
-              }
-            },
-
-            close: function() {
-
-            }
-          });
-
-        });
-
-
-      }
-      let durationChoiceHandler = function(event) {
-        controlName = $(this).attr('name');
-        controlValue = $(this).attr('value');
-
-        event.stopPropagation();
-        let durationChoice = 20;
-        durationDialog = $( "#duration-dialog-form" ).dialog({
-//                  autoOpen: false,
-          height:'auto', width:'auto',
-          modal: true,
-          buttons: {
-            'Close': function() {
-              $(this).dialog('close');
-            }
-          },
-
-          close: function() {
-
-          }
-        });
-      }
-
-      let toggleClickHandler = function() {
-        $.ajax({
-          type: "POST",
-          url: '/toggle',
-          data: { control:  $(this).attr('name') },
-          success: function() {
-            $(this).removeClass('error');
-            updateStatus();
-          },
-          error: function () {
-            $(this).addClass('error')
-          },
-          dataType: 'json'
-        });
-      }
-
-      let setOverrideClickHandler = function(controlName, durationMinutes, controlValue, successHandler, failureHandler) {
-        $.ajax({
-          type: "POST",
-          url: '/override',
-          data: {
-            control:  controlName,
-            start: 0,
-            duration: durationMinutes * 60,
-            value: controlValue,
-          },
-          success: successHandler,
-          error: failureHandler,
-          dataType: 'json'
-        });
-      }
-
-      let updateStatus = function () {
-        $.getJSON( "status", function( data ) {
-
-
-          $('.metric-widget#water .value').text(Number(data.metrics.temp).toFixed(2));
-          let time = new Date(data.metrics.time * 1000);
-          $('.metric-widget#time .value').text(time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),);
-          $('.metric-widget#time .label').text(time.toLocaleDateString());
-          $('.metric-widget#uptime .value').text(humanizeDuration(data.metrics.uptime*1000, {largest: 1, round: true}));
-
-          $.each(data.controls, function(index, controlData) {
-            let control  = $(`#spacontrols .spacontrol[name="${controlData['name']}"]`);
-            let controlButton = control.find('.control');
-            let scheduler = control.find('.scheduler');
-
-            let valNames = ["OFF", "ON"];
-            switch(controlData['type']) {
-              case 'off-low-high':
-                valNames = ["OFF", "LOW", "HIGH"];
-                break;
-              case 'sensor-based':
-                for (let i = controlData['min'] ; i <= controlData['max']; i++) {
-                  valNames[i] = i + "F";
-                }
-                break;
-            }
-
-            if (control.length == 0) {
-              //first load, create controls
-              control = $('#templates .spacontrol')
-                      .clone()
-                      .attr('name', controlData['name'])
-                      .addClass(controlData['type']);
-              controlButton = control.find('.control')
-                      .attr('value', controlData['value'])
-                      .attr('name', controlData['name']);
-              scheduler = control.find('.scheduler')
-                      .on('click', durationChoiceHandler)
-                      .attr('value', controlData['value'])
-                      .attr('name', controlData['name']);
-
-              control.find('.control-configure').on('click', configControlHandler);
-
-              control.find('.control-dependent')
-                      .toggle(controlData['depctl'] != null)
-                      .attr('title', "Depends on " + controlData['depctl'] + " and may turn on when required");
-
-              switch(controlData['type']) {
-                case 'sensor-based':
-                  // TODO: unhardcode default duration
-                  let defaultDuration = 60;
-
-                  controlButton.on('click', function () {
-                    let newTemp = prompt("Temperature");
-                    if (newTemp) {
-                      setOverrideClickHandler(
-                              controlData['name'],
-                              // look that up in up-to-date data store, not the closure-local copy that's out of date
-                              (control.data('status')['ORT'] > 0) ? control.data('status')['ORT']/60 : defaultDuration,
-                              newTemp,
-                              updateStatus
-                      );
-                    }
-                  });
-
-                  let clickTimeout;
-                  let changeDelta = 0;
-                  let delayedChange = function(delta) {
-                    clearTimeout(clickTimeout);
-                    changeDelta += delta;
-                    let currentValue = parseInt(controlButton.attr('value'));
-                    control.find('.control-state').text(valNames[currentValue + changeDelta]); //duplicated below
-                    clickTimeout = setTimeout(function(){
-                      setOverrideClickHandler(
-                              controlData['name'],
-                              // look that up in up-to-date data store, not the closure-local copy that's out of date
-                              (control.data('status')['ORT'] > 0) ? control.data('status')['ORT']/60 : defaultDuration,
-                              changeDelta + currentValue,
-                              updateStatus);
-                      changeDelta = 0;
-                    }, 500);
-                  }
-
-                  control.find('.minus').on('click', function() {
-                    delayedChange(-1);
-                  });
-                  control.find('.plus').on('click', function() {
-                    delayedChange(1);
-                  });
-                  break;
-                case 'off-low-high':
-                  controlButton.on('click', toggleClickHandler);
-                  break;
-                default:
-                  controlButton.on('click', toggleClickHandler);
-              }
-
-            }
-            $('#spacontrols').append(control);
-
-            controlButton.attr('value', controlData['value']);
-            scheduler.attr('value', controlData['value']);
-            control.data('status', controlData);
-            control.find('.control-name').text(controlData['name']);
-            control.find('.control-state').text(valNames[controlData['value']]);
-            control.find('.scheduler-ort').text(humanizeDuration(controlData['ORT'] * 1000,  { round: true, largest: 1  }));
-            scheduler.toggle(controlData['ORT'] > 0);
-
-            // 250+ is special
-            let isOn = controlData['val_o'] > 0;
-            control.find('.control-is-dep-on').toggle(!isOn && controlData['val_d'] > 0);
-            control.find('.control-is-on').toggle(isOn);
-            control.find('.control-is-off').toggle(!isOn);
-          });
-
-        });
-      };
-
-
-
-      updateStatus();
-      setInterval(updateStatus, 5000);
-    });
-
-  </script>
 </head>
 <body>
-<div id="spastatus">
-  <div class="metric-widget" id="water">
-    <div class="title">Water</div>
-    <div class="data">
+
+  <div id="topbar">
+    <div class="metric" id="m-water">
+      <div class="label">Water</div>
       <div class="value">--</div>
-      <div class="label">&deg;F</div>
     </div>
-  </div>
-  <div class="metric-widget" id="time">
-    <div class="title">Time</div>
-    <div class="data">
+    <div class="metric" id="m-time">
+      <div class="label">Time</div>
       <div class="value">--</div>
-      <div class="label">on device</div>
+      <div class="sub"></div>
     </div>
-  </div>
-  <div class="metric-widget" id="uptime">
-    <div class="title">Uptime</div>
-    <div class="data">
+    <div class="metric" id="m-uptime">
+      <div class="label">Uptime</div>
       <div class="value">--</div>
-      <div class="label">since boot</div>
+      <div class="sub">since boot</div>
     </div>
+    <button id="settingsBtn" title="Settings">&#9881;</button>
   </div>
 
-</div>
+  <div id="controls"></div>
 
-<div id="configbutton">&#9881;</div>
-
-<div id="spacontrols">
-</div>
-
-<div id="systemconfigdialog">
-  This configures the WiFi network that this controller should connect to.
-  <br/>
-  This is independent of the built-in WiFi AP.
-  <form>
-    <label>SSID</label>
-    <input type='text' size=25 name='wifi_ssid'/>
-
-    <br/>
-    <label>Password</label>
-    <input type='text' size=25 name='wifi_pass'/>
-
-
-  </form>
-</div>
-
-<div id="templates" style="display: none">
-  <div class="spacontrol">
-    <div class="control-name"></div>
-    <div class="top-right-icons">
-      <span class="control-power-state control-is-dep-on" title="Currently telling dependent controls to be ON">&#128993;</span>
-      <span class="control-power-state control-is-on" title="Currently ON">&#x1F534;</span>
-      <span class="control-power-state control-is-off" title="Currently OFF">&#x26AA;</span>
-      <span class="control-dependent" title="Depends on another control">&#x2942;</span>
-      <span class="control-configure">&#9881;</span>
+  <!-- Duration picker -->
+  <dialog id="durationDialog">
+    <div class="dlg-head" id="durationTitle">Run for…</div>
+    <div class="dlg-body">
+      <div class="note">Keep this control in its current mode for how long before returning to the normal schedule?</div>
+      <div id="durationGrid"></div>
     </div>
-    <div class="button-row">
-      <button type="button" class="control-incremental minus">-</button>
-      <button type="button" class="control">
-        <span class="control-state"></span>
-      </button>
-      <button type="button" class="control-incremental plus">+</button>
+    <div class="dlg-foot">
+      <button class="btn" data-close>Cancel</button>
     </div>
-    <button type="button" class="scheduler">
-      <div class="scheduler-on">&#9201;</div>
-      <div class="scheduler-ort"></div>
-    </button>
-  </div>
-</div>
+  </dialog>
 
-<div id="duration-dialog-form" class="dialog-template" title="Select Duration">
-  Please select how long this control should remain in this mode before returning to normal schedule.
-  <div id="duration-options">
-  </div>
-  </form>
-</div>
+  <!-- Schedule config -->
+  <dialog id="scheduleDialog">
+    <div class="dlg-head" id="scheduleTitle">Schedule</div>
+    <div class="dlg-body">
+      <div class="field">
+        <label>Percentage of day this control is "ON"</label>
+        <input type="number" id="percentageOfDayOnTime" min="0" max="100">
+        <span class="hint" id="hintDaily"></span>
+      </div>
+      <div class="field">
+        <label>Number of "ON" periods per day</label>
+        <input type="number" id="numberOfTimesToRun" min="1">
+        <span class="hint" id="hintPer"></span>
+      </div>
+      <div class="field">
+        <label>Value when scheduled ON <span class="note" id="onRange"></span></label>
+        <input type="number" id="normalValueOn">
+      </div>
+      <div class="field">
+        <label>Value when scheduled OFF <span class="note" id="offRange"></span></label>
+        <input type="number" id="normalValueOff">
+      </div>
+      <div class="field">
+        <label>Default override duration (seconds)</label>
+        <input type="number" id="overrideDefaultDurationSeconds" min="0">
+      </div>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn" data-close>Cancel</button>
+      <button class="btn primary" id="scheduleSave">Save</button>
+    </div>
+  </dialog>
 
-<div id="control-config-dialog-form" class="dialog-template" title="Configure Control">
-  <h2>Configure Normal (Daily) Schedule</h2>
-  <form>
-    <input type="number" id="percentageOfDayOnTime" class="validate-percent" min="0" max="100"/>
-    <label for="percentageOfDayOnTime">Percentage Of Day This Control Should Be "ON"</label>
-    <br>
-    <input id="percentageOfDayOnTimeHours" disabled="disabled"/>
-    <label for="percentageOfDayOnTimeHours">Total Daily Runtime</label>
-    <br>
-    <input type="number" id="numberOfTimesToRun" class="validate-unsigned" min="0"/>
-    <label for="numberOfTimesToRun">Number of "ON" periods during a day</label>
-    <br>
-    <input id="numberOfTimesToRunHours" disabled="disabled"/>
-    <label for="numberOfTimesToRunHours">Per Run Period</label>
-    <br>
-    <input type="number" id="normalValueOn" class="validate-min-max"/>
-    <label for="normalValueOn">* Value of control when scheduled to be "ON"</label>
-    <br>
-    <input type="number" id="normalValueOff" class="validate-min-max"/>
-    <label for="normalValueOff">* Value of control when scheduled to be "OFF"</label>
-    <br>
-    <input type="number" id="overrideDefaultDurationSeconds" class="validate-unsigned"/>
-    <label for="overrideDefaultDurationSeconds" min="0">Default (override) duration when turning on/off, seconds</label>
-    <br>
-    <div>*Valid values are <span class="min"></span> to <span class="max"></span></div>
+  <!-- Settings -->
+  <dialog id="settingsDialog">
+    <div class="dlg-head">Settings</div>
+    <div class="dlg-body">
+      <div class="field">
+        <label>Temperature unit</label>
+        <div class="seg" id="unitSeg">
+          <button data-unit="1">Celsius</button>
+          <button data-unit="0">Fahrenheit</button>
+        </div>
+      </div>
+      <hr style="border-color:var(--line); width:100%">
+      <div class="note">WiFi network this controller connects to (separate from the built-in setup AP).</div>
+      <div class="field">
+        <label>SSID</label>
+        <input type="text" id="wifi_ssid" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="wifi_pass" autocomplete="off">
+      </div>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn" data-close>Close</button>
+      <button class="btn primary" id="wifiSave">Save WiFi &amp; Reboot</button>
+    </div>
+  </dialog>
 
-  </form>
-  <span class="status"></span>
-</div>
+  <div id="toast"></div>
+
+<script>
+"use strict";
+(function () {
+  var POLL_MS = 5000;
+  var unit = 1;            // 0 = F, 1 = C (from controller)
+  var statusByName = {};   // latest control status keyed by name
+  var pendingSetpoint = {};// name -> debounced setpoint state
+
+  var durationOptions = [0,5,10,15,20,30,45,60,120,240,480,720,1440]; // minutes
+
+  // ---- helpers ----
+  function isC() { return unit === 1; }
+  function toDisplayTemp(c) { return isC() ? c : (c * 9 / 5 + 32); }
+  function unitLabel() { return isC() ? "°C" : "°F"; }
+
+  function humanize(sec) {
+    sec = Math.round(sec);
+    if (sec <= 0) return "0s";
+    var d = Math.floor(sec / 86400); sec -= d * 86400;
+    var h = Math.floor(sec / 3600);  sec -= h * 3600;
+    var m = Math.floor(sec / 60);    sec -= m * 60;
+    var parts = [];
+    if (d) parts.push(d + "d");
+    if (h) parts.push(h + "h");
+    if (m) parts.push(m + "m");
+    if (!d && !h && sec) parts.push(sec + "s");
+    return parts.slice(0, 2).join(" ") || "0s";
+  }
+
+  function post(url, data) {
+    var body = Object.keys(data).map(function (k) {
+      return encodeURIComponent(k) + "=" + encodeURIComponent(data[k]);
+    }).join("&");
+    return fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body
+    }).then(function (r) { if (!r.ok) throw new Error(r.status); return r; });
+  }
+
+  var toastTimer;
+  function toast(msg) {
+    var t = document.getElementById("toast");
+    t.textContent = msg; t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2500);
+  }
+
+  var VAL_NAMES = {
+    "off-on": ["OFF", "ON"],
+    "off-low-high": ["OFF", "LOW", "HIGH"]
+  };
+  function stateClass(type, val) {
+    if (type === "off-low-high") return ["", "low", "high"][val] || "";
+    return val > 0 ? "on" : "";
+  }
+
+  // ---- rendering ----
+  function ensureCard(c) {
+    var id = "card-" + c.name;
+    var card = document.getElementById(id);
+    if (card) return card;
+
+    card = document.createElement("div");
+    card.className = "card";
+    card.id = id;
+    card.innerHTML =
+      '<div class="card-head">' +
+        '<span class="card-name"></span>' +
+        '<span class="card-icons">' +
+          '<span class="badge" style="display:none"></span>' +
+          '<span class="dep-flag" title="May turn on when another control needs it" style="display:none">&#10562;</span>' +
+          '<span class="dot"></span>' +
+          '<button class="iconbtn cfg" title="Configure schedule">&#9881;</button>' +
+        '</span>' +
+      '</div>' +
+      '<div class="action"></div>';
+
+    card.querySelector(".cfg").addEventListener("click", function () { openSchedule(c.name); });
+    card.querySelector(".badge").addEventListener("click", function () { openDuration(c.name); });
+    document.getElementById("controls").appendChild(card);
+    buildAction(card, c);
+    return card;
+  }
+
+  function buildAction(card, c) {
+    var action = card.querySelector(".action");
+    action.innerHTML = "";
+    if (c.type === "sensor-based") {
+      var minus = mk("button", "step-btn", "−");
+      var sp = mk("div", "setpoint", "");
+      var plus = mk("button", "step-btn", "+");
+      minus.addEventListener("click", function () { stepSetpoint(c.name, -1); });
+      plus.addEventListener("click", function () { stepSetpoint(c.name, 1); });
+      action.append(minus, sp, plus);
+    } else {
+      var btn = mk("button", "state-btn", "");
+      btn.addEventListener("click", function () { toggleControl(c.name); });
+      action.append(btn);
+    }
+  }
+
+  function mk(tag, cls, txt) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (txt != null) e.textContent = txt;
+    return e;
+  }
+
+  function renderCard(c) {
+    var card = ensureCard(c);
+    card.querySelector(".card-name").textContent = c.name;
+
+    var isOn = c.val_o > 0;
+    var isDepOn = !isOn && c.val_d > 0;
+    card.classList.toggle("is-on", isOn);
+
+    var dot = card.querySelector(".dot");
+    dot.className = "dot" + (isOn ? " on" : isDepOn ? " dep" : "");
+    dot.title = isOn ? "ON" : isDepOn ? "ON (required by another control)" : "OFF";
+
+    card.querySelector(".dep-flag").style.display = c.depctl ? "" : "none";
+
+    var badge = card.querySelector(".badge");
+    if (c.ORT > 0) {
+      badge.textContent = "⏱ " + humanize(c.ORT);
+      badge.style.display = "";
+      badge.title = "Override active — tap to change duration";
+    } else {
+      badge.style.display = "none";
+    }
+
+    if (c.type === "sensor-based") {
+      var live = pendingSetpoint[c.name];
+      var shown = live != null ? live : c.value;   // native °C
+      card.querySelector(".setpoint").innerHTML =
+        Math.round(toDisplayTemp(shown)) + unitLabel() +
+        "<small>setpoint</small>";
+    } else {
+      var names = VAL_NAMES[c.type] || ["OFF", "ON"];
+      var btn = card.querySelector(".state-btn");
+      btn.textContent = names[c.value] || String(c.value);
+      btn.className = "state-btn " + stateClass(c.type, c.value);
+    }
+  }
+
+  // ---- actions ----
+  function toggleControl(name) {
+    post("/toggle", { control: name })
+      .then(refresh)
+      .catch(function () { flashError(name); });
+  }
+
+  function stepSetpoint(name, delta) {
+    var c = statusByName[name];
+    if (!c) return;
+    var cur = pendingSetpoint[name] != null ? pendingSetpoint[name] : c.value; // native °C
+    var next = Math.max(c.min, Math.min(c.max, cur + delta));
+    pendingSetpoint[name] = next;
+    renderCard(c); // optimistic
+    clearTimeout(pendingSetpoint["_t_" + name]);
+    pendingSetpoint["_t_" + name] = setTimeout(function () {
+      var duration = c.ORT > 0 ? c.ORT : (c.DO || 0);
+      post("/override", { control: name, start: 0, duration: duration, value: pendingSetpoint[name] })
+        .then(function () { delete pendingSetpoint[name]; refresh(); })
+        .catch(function () { delete pendingSetpoint[name]; flashError(name); });
+    }, 600);
+  }
+
+  function flashError(name) {
+    var card = document.getElementById("card-" + name);
+    if (!card) return;
+    card.classList.add("error");
+    setTimeout(function () { card.classList.remove("error"); }, 1200);
+    toast("Request failed for " + name);
+  }
+
+  // ---- duration dialog ----
+  var durationTarget = null;
+  function openDuration(name) {
+    durationTarget = name;
+    document.getElementById("durationTitle").textContent = "Run “" + name + "” for…";
+    var grid = document.getElementById("durationGrid");
+    grid.innerHTML = "";
+    durationOptions.forEach(function (min) {
+      var b = mk("button", null, min === 0 ? "End now" : humanize(min * 60));
+      b.addEventListener("click", function () { applyDuration(min); });
+      grid.appendChild(b);
+    });
+    document.getElementById("durationDialog").showModal();
+  }
+  function applyDuration(min) {
+    var c = statusByName[durationTarget];
+    if (!c) return;
+    post("/override", { control: durationTarget, start: 0, duration: min * 60, value: c.value })
+      .then(function () { document.getElementById("durationDialog").close(); refresh(); })
+      .catch(function () { flashError(durationTarget); });
+  }
+
+  // ---- schedule dialog ----
+  var scheduleTarget = null;
+  function openSchedule(name) {
+    scheduleTarget = name;
+    var c = statusByName[name] || {};
+    document.getElementById("scheduleTitle").textContent = "Schedule: " + name;
+    document.getElementById("onRange").textContent = "(" + c.min + "–" + c.max + ")";
+    document.getElementById("offRange").textContent = "(" + c.min + "–" + c.max + ")";
+    fetch("/configureControl?control=" + encodeURIComponent(name))
+      .then(function (r) { return r.json(); })
+      .then(function (cfg) {
+        ["percentageOfDayOnTime","numberOfTimesToRun","normalValueOn","normalValueOff","overrideDefaultDurationSeconds"]
+          .forEach(function (k) { document.getElementById(k).value = cfg[k]; });
+        updateScheduleHints();
+        document.getElementById("scheduleDialog").showModal();
+      })
+      .catch(function () { toast("Could not load schedule"); });
+  }
+  function updateScheduleHints() {
+    var pct = parseFloat(document.getElementById("percentageOfDayOnTime").value) || 0;
+    var n = parseFloat(document.getElementById("numberOfTimesToRun").value) || 1;
+    var dailySec = pct * 24 * 3600 / 100;
+    document.getElementById("hintDaily").textContent = "≈ " + humanize(dailySec) + " per day";
+    document.getElementById("hintPer").textContent = "≈ " + humanize(dailySec / n) + " on, per period";
+  }
+  document.getElementById("percentageOfDayOnTime").addEventListener("input", updateScheduleHints);
+  document.getElementById("numberOfTimesToRun").addEventListener("input", updateScheduleHints);
+  document.getElementById("scheduleSave").addEventListener("click", function () {
+    var c = statusByName[scheduleTarget] || {};
+    var data = { control: scheduleTarget };
+    var ok = true;
+    ["percentageOfDayOnTime","numberOfTimesToRun","normalValueOn","normalValueOff","overrideDefaultDurationSeconds"]
+      .forEach(function (k) {
+        var el = document.getElementById(k);
+        data[k] = el.value;
+        if ((k === "normalValueOn" || k === "normalValueOff") &&
+            (Number(el.value) < c.min || Number(el.value) > c.max)) {
+          el.classList.add("invalid"); ok = false;
+        } else { el.classList.remove("invalid"); }
+      });
+    if (!ok) { toast("Value out of range (" + c.min + "–" + c.max + ")"); return; }
+    post("/configureControl", data)
+      .then(function () { document.getElementById("scheduleDialog").close(); refresh(); })
+      .catch(function (e) { toast("Save failed"); });
+  });
+
+  // ---- settings dialog ----
+  document.getElementById("settingsBtn").addEventListener("click", function () {
+    markUnit();
+    document.getElementById("settingsDialog").showModal();
+  });
+  function markUnit() {
+    document.querySelectorAll("#unitSeg button").forEach(function (b) {
+      b.classList.toggle("sel", Number(b.dataset.unit) === unit);
+    });
+  }
+  document.querySelectorAll("#unitSeg button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var u = Number(b.dataset.unit);
+      post("/tempUnit", { unit: u })
+        .then(function () { unit = u; markUnit(); refresh(); toast("Unit updated"); })
+        .catch(function () { toast("Could not set unit"); });
+    });
+  });
+  document.getElementById("wifiSave").addEventListener("click", function () {
+    post("/configureWifi", {
+      wifi_ssid: document.getElementById("wifi_ssid").value,
+      wifi_pass: document.getElementById("wifi_pass").value
+    }).then(function () { toast("Saved — rebooting"); })
+      .catch(function () { toast("Save failed (auth required)"); });
+  });
+
+  // close buttons for all dialogs
+  document.querySelectorAll("dialog [data-close]").forEach(function (b) {
+    b.addEventListener("click", function () { b.closest("dialog").close(); });
+  });
+
+  // ---- status polling ----
+  function refresh() { return updateStatus(); }
+  function updateStatus() {
+    return fetch("status").then(function (r) { return r.json(); }).then(function (data) {
+      var m = data.metrics || {};
+      if (typeof m.temp_unit !== "undefined") unit = Number(m.temp_unit);
+
+      var waterEl = document.querySelector("#m-water .value");
+      waterEl.textContent = (m.temp == null) ? "--" : (toDisplayTemp(m.temp).toFixed(1) + unitLabel());
+
+      if (m.time) {
+        var t = new Date(m.time * 1000);
+        document.querySelector("#m-time .value").textContent =
+          t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        document.querySelector("#m-time .sub").textContent = t.toLocaleDateString();
+      }
+      if (m.uptime != null) {
+        document.querySelector("#m-uptime .value").textContent = humanize(m.uptime);
+      }
+
+      (data.controls || []).forEach(function (c) {
+        statusByName[c.name] = c;
+        renderCard(c);
+      });
+    }).catch(function () { /* transient network error, keep last state */ });
+  }
+
+  updateStatus();
+  setInterval(updateStatus, POLL_MS);
+})();
+</script>
 </body>
 </html>
