@@ -56,7 +56,14 @@ bool ESPNowUtils::addPeer(const uint8_t *peer_addr) {      // add pairing
 }
 
 // callback when data is sent
+// Arduino-ESP32 3.1 changed the send-callback signature from (mac_addr) to
+// (esp_now_send_info_t* = wifi_tx_info_t), where des_addr is the peer MAC.
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 1, 0)
+void ESPNowUtils::OnDataSent(const esp_now_send_info_t *tx_info, esp_now_send_status_t status) {
+    const uint8_t *mac_addr = tx_info->des_addr;
+#else
 void ESPNowUtils::OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+#endif
     Serial.print("Last Packet Send Status: ");
     Serial.print(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success to " : "Delivery Fail to ");
     printMAC(mac_addr);

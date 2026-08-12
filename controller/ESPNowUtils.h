@@ -9,6 +9,7 @@
 #include <WiFi.h>
 //#include "AsyncTCP.h"
 #include <ArduinoJson.h>
+#include <esp_arduino_version.h>
 
 #include "hot_tub_types.h"
 
@@ -46,7 +47,11 @@ private:
     static void readDataToSend();
     static void printMAC(const uint8_t * mac_addr);
     static bool addPeer(const uint8_t *peer_addr);
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 1, 0)
+    static void OnDataSent(const esp_now_send_info_t *tx_info, esp_now_send_status_t status);
+#else
     static void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status);
+#endif
     static void OnDataRecv(const esp_now_recv_info* info, const uint8_t *incomingData, int len);
     static void initESP_NOW();
 };

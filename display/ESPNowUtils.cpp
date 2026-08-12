@@ -53,7 +53,11 @@ void ESPNowUtils::registerEspCommStatusCallBackHandler(ESPNowUtils::esp_comm_sta
 }
 
 // callback when data is sent
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 1, 0)
+void ESPNowUtils::OnDataSent(const esp_now_send_info_t *tx_info, esp_now_send_status_t status) {
+#else
 void ESPNowUtils::OnDataSent(  const uint8_t *mac_addr, esp_now_send_status_t status) {
+#endif
     Serial.print("\r\nLast Packet Send Status:\t");
     lastMessageSentTime = millis();
     Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
@@ -63,9 +67,12 @@ void ESPNowUtils::OnDataSent(  const uint8_t *mac_addr, esp_now_send_status_t st
 }
 
 
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 void ESPNowUtils::OnDataRecv(const esp_now_recv_info* info, const uint8_t *incomingData, int len) {
-
     uint8_t * mac_addr = info->src_addr;
+#else
+void ESPNowUtils::OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
+#endif
 //    Serial.print("Packet received from: ");
 //    printMAC(mac_addr);
 //    Serial.printf("data size = %d", sizeof(incomingData));

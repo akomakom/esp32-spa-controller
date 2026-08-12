@@ -8,6 +8,7 @@
 #include <WiFi.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
+#include <esp_arduino_version.h>
 //#include "AsyncTCP.h"
 #include <EEPROM.h>
 
@@ -70,8 +71,19 @@ private:
 //    inline static hot_tub_command_recv_callback callback;
     static void addPeer(const uint8_t * mac_addr, uint8_t chan);
     static void printMAC(const uint8_t * mac_addr);
+    // ESP-NOW callback signatures changed across Arduino-ESP32 cores:
+    //  - recv gained esp_now_recv_info in 3.0
+    //  - send switched to esp_now_send_info_t (wifi_tx_info_t) in 3.1
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 1, 0)
+    static void OnDataSent(const esp_now_send_info_t *tx_info, esp_now_send_status_t status);
+#else
     static void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status);
+#endif
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     static void OnDataRecv(const esp_now_recv_info* info, const uint8_t *incomingData, int len);
+#else
+    static void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len);
+#endif
     static PairingStatus autoPairing();
 };
 
