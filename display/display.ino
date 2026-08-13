@@ -692,6 +692,19 @@ static void btn_event_cb(lv_event_t * e)
 
     if(code == LV_EVENT_CLICKED) {
         struct_status_control * status = (struct_status_control*) lv_event_get_user_data(e);
+
+        // Debounce: the resistive panel can report a tap as press-release-press,
+        // firing two CLICKED events that toggle the control on then off. Ignore a
+        // second click on the same control within a short window.
+        static unsigned long lastClickMillis[MAX_CONTROLS] = {0};
+        #define TOUCH_DEBOUNCE_MS 350
+        if (status->control_id < MAX_CONTROLS) {
+            if (millis() - lastClickMillis[status->control_id] < TOUCH_DEBOUNCE_MS) {
+                return; // bounce — ignore
+            }
+            lastClickMillis[status->control_id] = millis();
+        }
+
         if (strcmp(status->type, "off-on") == 0 || strcmp(status->type, "off-low-high") == 0) {
             // if we're in override, cancel it
             u_int32_t overrideTime = status->ORT > 0 ? 0 : status->DO;
