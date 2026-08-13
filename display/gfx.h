@@ -30,7 +30,11 @@
 #include <Arduino_GFX_Library.h>
 #define TFT_BL 2
 #define GFX_BL DF_GFX_BL // default backlight pin, you may replace DF_GFX_BL to actual backlight pin
-#define GFX_FRAME_BUFFER_FRACTION 4 // divide size of width * height * color by this factor and allocate that many bytes
+// LVGL draw-buffer size = (width * height) / this. Smaller buffer -> a full-screen
+// repaint (e.g. closing the setpoint overlay) is flushed as more, smaller PSRAM bursts
+// with CPU-only render gaps between them, giving the RGB panel's bounce buffer windows
+// to refill. Too large a burst starves the refill and the image rolls vertically.
+#define GFX_FRAME_BUFFER_FRACTION 10 // divide size of width * height * color by this factor and allocate that many bytes
 
 /* More dev device declaration: https://github.com/moononournation/Arduino_GFX/wiki/Dev-Device-Declaration */
 #if defined(DISPLAY_DEV_KIT)
@@ -166,6 +170,13 @@ void gfx_loop() {
 
 void gfx_set_screen_timeout(unsigned long timeout) {
     gfx_screen_timeout = timeout;
+}
+
+// Ignore touch input for the next `millis_to_ignore` ms. Used right after closing a
+// full-screen dialog so the tap that dismissed it doesn't fall through onto the control
+// that is now directly under the finger. Keeps the screen awake (does not dim).
+void gfx_suppress_touch(unsigned long millis_to_ignore) {
+    gfx_ignore_touch_until = millis() + millis_to_ignore;
 }
 
 void gfx_init() {

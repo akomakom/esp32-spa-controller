@@ -413,6 +413,9 @@ void showSetpointDialog() {
 
 void hideSetpointDialog() {
     lv_obj_add_flag(sensorBasedControlPanel, LV_OBJ_FLAG_HIDDEN);
+    // The dismiss tap is right over a control now that the overlay is gone; swallow
+    // touches briefly so it doesn't immediately toggle whatever is under the finger.
+    gfx_suppress_touch(500);
 }
 
 void setup()
