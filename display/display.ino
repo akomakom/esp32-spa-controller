@@ -280,19 +280,22 @@ void createSensorBasedDialog() {
     static lv_coord_t row_dsc[] = {lv_pct(10), lv_pct(40), lv_pct(40), LV_GRID_TEMPLATE_LAST};
 
     // dialog (can it be created on the active screen?  I want it to be a background layer)
-    sensorBasedControlPanel = lv_obj_create(NULL);
+    // Full-screen overlay that is a CHILD of the main screen, not a separate screen.
+    // Opening/closing it is clear-hidden + move-foreground + a short single-screen slide
+    // (see showSetpointDialog/hideSetpointDialog) instead of lv_scr_load_anim. A screen
+    // swap composites two full screens for the whole 500ms animation, which starved the
+    // RGB panel's bounce-buffer refill from PSRAM and made the image roll vertically; an
+    // overlay on one screen avoids that sustained contention.
+    sensorBasedControlPanel = lv_obj_create(mainScreen);
+    lv_obj_set_size(sensorBasedControlPanel, lv_pct(100), lv_pct(100));
+    lv_obj_align(sensorBasedControlPanel, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_obj_set_style_border_width(sensorBasedControlPanel, 0, 0);
+    lv_obj_set_style_radius(sensorBasedControlPanel, 0, 0);
+    lv_obj_add_flag(sensorBasedControlPanel, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(sensorBasedControlPanel, LV_OBJ_FLAG_SCROLLABLE);
 
     TRACE("mbox 1");
-    lv_scr_load(sensorBasedControlPanel);
-    TRACE("mbox 1.1");
-//    lv_obj_add_flag(sensorBasedControlPanel, LV_OBJ_FLAG_HIDDEN);
-    TRACE("mbox 1.2");
-//    lv_obj_move_background(sensorBasedControlPanel);
-    TRACE("mbox 1.3");
-//    lv_obj_set_size(sensorBasedControlPanel, lv_pct(90), lv_pct(90));
     lv_obj_add_style(sensorBasedControlPanel, &style, 0);
-//    lv_obj_add_style(sensorBasedControlPanel, &styleNoPadding, 0);
-    lv_obj_center(sensorBasedControlPanel);
     TRACE("mbox 1.4");
     lv_obj_set_style_grid_column_dsc_array(sensorBasedControlPanel, col_dsc, 0);
     lv_obj_set_style_grid_row_dsc_array(sensorBasedControlPanel, row_dsc, 0);
@@ -397,6 +400,19 @@ void createSensorBasedDialog() {
     lv_obj_center(btnLabel);
 
     TRACE("mbox 8");
+}
+
+// Show/hide the setpoint overlay INSTANTLY (no animation). Any full-screen animation
+// sustains a heavy framebuffer redraw that starves the RGB panel's bounce-buffer
+// refill from PSRAM and makes the image roll vertically; a single un-hide is one
+// redraw, the least stress possible for a full-screen dialog.
+void showSetpointDialog() {
+    lv_obj_clear_flag(sensorBasedControlPanel, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(sensorBasedControlPanel);
+}
+
+void hideSetpointDialog() {
+    lv_obj_add_flag(sensorBasedControlPanel, LV_OBJ_FLAG_HIDDEN);
 }
 
 void setup()
@@ -794,7 +810,7 @@ static void btn_event_cb(lv_event_t * e)
             TRACE("SENS DISP 2.1");
             lv_label_set_text_fmt(sensorBasedControlDescription, "Adjust setpoint for %s", status->name);
             TRACE("SENS DISP 3");
-            lv_scr_load_anim(sensorBasedControlPanel, LV_SCR_LOAD_ANIM_OVER_TOP, 500, 10, false);
+            showSetpointDialog();
 //            lv_obj_move_foreground(sensorBasedControlPanel);
 //            lv_obj_clear_flag(sensorBasedControlPanel, LV_OBJ_FLAG_HIDDEN);
 
@@ -859,8 +875,7 @@ static void lv_spinbox_event_cb(lv_event_t * e)
         }
 //        lv_obj_move_background(sensorBasedControlPanel);
 //        lv_obj_add_flag(sensorBasedControlPanel, LV_OBJ_FLAG_HIDDEN);
-//        lv_scr_load(mainScreen);
-        lv_scr_load_anim(mainScreen, LV_SCR_LOAD_ANIM_OVER_BOTTOM, 500, 10, false);
+        hideSetpointDialog();
     }
     TRACE("SENS CB END");
 
