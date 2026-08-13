@@ -28,9 +28,6 @@
 
 #include <lvgl.h>
 #include <Arduino_GFX_Library.h>
-#include <esp_lcd_panel_rgb.h>
-#include <esp_lcd_panel_ops.h>
-#include "freertos/semphr.h"
 #define TFT_BL 2
 #define GFX_BL DF_GFX_BL // default backlight pin, you may replace DF_GFX_BL to actual backlight pin
 #define GFX_FRAME_BUFFER_FRACTION 4 // divide size of width * height * color by this factor and allocate that many bytes
@@ -92,33 +89,18 @@ static unsigned long gfx_ignore_touch_until = 0;
 static unsigned long gfx_screen_timeout = 60000;
 static u_int8_t displayBrightness = BRIGHTNESS_FULL;
 
-// ---- esp_lcd RGB panel driven directly with a DOUBLE framebuffer ----
-// Two full-screen framebuffers in PSRAM are used as LVGL's draw buffers. The
-// panel scans out one while LVGL renders into the other, swapping at vsync, so
-// there is no PSRAM read/write contention -> the intermittent frame shift is gone.
-static esp_lcd_panel_handle_t rgb_panel_handle = NULL;
-static SemaphoreHandle_t sem_vsync_end = NULL;
-static SemaphoreHandle_t sem_gui_ready = NULL;
-
-static bool IRAM_ATTR rgb_vsync_cb(esp_lcd_panel_handle_t panel,
-                                   const esp_lcd_rgb_panel_event_data_t *edata, void *user_data) {
-    BaseType_t high_task_awoken = pdFALSE;
-    if (sem_gui_ready && xSemaphoreTakeFromISR(sem_gui_ready, &high_task_awoken) == pdTRUE) {
-        xSemaphoreGiveFromISR(sem_vsync_end, &high_task_awoken);
-    }
-    return high_task_awoken == pdTRUE;
-}
-
 /* Display flushing */
 void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p)
 {
-    // With num_fbs=2 + full_refresh, color_p is one of the panel's framebuffers,
-    // so draw_bitmap just swaps (no copy). Wait for the swap to take effect at the
-    // next vsync before letting LVGL render into the now-free buffer (tear-free).
-    if (sem_gui_ready) xSemaphoreGive(sem_gui_ready);
-    if (sem_vsync_end) xSemaphoreTake(sem_vsync_end, portMAX_DELAY);
-    esp_lcd_panel_draw_bitmap(rgb_panel_handle, area->x1, area->y1,
-                              area->x2 + 1, area->y2 + 1, (void *)color_p);
+    uint32_t w = (area->x2 - area->x1 + 1);
+    uint32_t h = (area->y2 - area->y1 + 1);
+
+#if (LV_COLOR_16_SWAP != 0)
+    gfx->draw16bitBeRGBBitmap(area->x1, area->y1, (uint16_t *)&color_p->full, w, h);
+#else
+    gfx->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t *)&color_p->full, w, h);
+#endif
+
     lv_disp_flush_ready(disp);
 }
 
@@ -181,61 +163,9 @@ void gfx_set_screen_timeout(unsigned long timeout) {
 
 void gfx_init() {
 
+    // Init Display
+    gfx->begin();
     lv_init();
-
-    // ---- Create the RGB panel directly via esp_lcd with two framebuffers ----
-    // (pins/timings copied exactly from the Arduino_GFX config above; the `gfx`
-    //  object is kept only for width()/height() and is intentionally not begin()'d.)
-    esp_lcd_rgb_panel_config_t panel_config = {};
-    panel_config.clk_src = LCD_CLK_SRC_DEFAULT;
-    panel_config.timings.pclk_hz = 10000000;
-    panel_config.timings.h_res = 480;
-    panel_config.timings.v_res = 272;
-    panel_config.timings.hsync_pulse_width = 1;
-    panel_config.timings.hsync_back_porch  = 43;
-    panel_config.timings.hsync_front_porch = 1;
-    panel_config.timings.vsync_pulse_width = 1;
-    panel_config.timings.vsync_back_porch  = 12;
-    panel_config.timings.vsync_front_porch = 3;
-    panel_config.timings.flags.hsync_idle_low  = 1; // hsync_polarity == 0
-    panel_config.timings.flags.vsync_idle_low  = 1; // vsync_polarity == 0
-    panel_config.timings.flags.de_idle_high    = 0;
-    panel_config.timings.flags.pclk_active_neg = 1;
-    panel_config.timings.flags.pclk_idle_high  = 0;
-    panel_config.data_width = 16;
-    panel_config.bits_per_pixel = 16;
-    panel_config.num_fbs = 2;                  // <-- double framebuffer
-    panel_config.bounce_buffer_size_px = 0;
-    panel_config.dma_burst_size = 64;
-    panel_config.hsync_gpio_num = 39;
-    panel_config.vsync_gpio_num = 41;
-    panel_config.de_gpio_num    = 40;
-    panel_config.pclk_gpio_num  = 42;
-    panel_config.disp_gpio_num  = GPIO_NUM_NC;
-    // RGB565 data lines, non-big-endian order (must match Arduino_GFX's mapping):
-    const int data_pins[16] = {
-        8, 3, 46, 9, 1,      // B0..B4
-        5, 6, 7, 15, 16, 4,  // G0..G5
-        45, 48, 47, 21, 14   // R0..R4
-    };
-    for (int i = 0; i < 16; i++) panel_config.data_gpio_nums[i] = data_pins[i];
-    panel_config.flags.fb_in_psram = 1;
-    panel_config.flags.disp_active_low = 1;
-
-    ESP_ERROR_CHECK(esp_lcd_new_rgb_panel(&panel_config, &rgb_panel_handle));
-
-    sem_vsync_end = xSemaphoreCreateBinary();
-    sem_gui_ready = xSemaphoreCreateBinary();
-    esp_lcd_rgb_panel_event_callbacks_t cbs = {};
-    cbs.on_vsync = rgb_vsync_cb;
-    esp_lcd_rgb_panel_register_event_callbacks(rgb_panel_handle, &cbs, NULL);
-
-    ESP_ERROR_CHECK(esp_lcd_panel_reset(rgb_panel_handle));
-    ESP_ERROR_CHECK(esp_lcd_panel_init(rgb_panel_handle));
-
-    void *fb0 = NULL, *fb1 = NULL;
-    ESP_ERROR_CHECK(esp_lcd_rgb_panel_get_frame_buffer(rgb_panel_handle, 2, &fb0, &fb1));
-
     delay(10);
     touch_init();
 
@@ -244,29 +174,37 @@ void gfx_init() {
     digitalWrite(TFT_BL, HIGH);
 #endif
 
-    screenWidth = gfx->width();    // 480 (object not begun; returns declared size)
-    screenHeight = gfx->height();  // 272
+    screenWidth = gfx->width();
+    screenHeight = gfx->height();
+#ifdef ESP32
+    disp_draw_buf = (lv_color_t *)heap_caps_malloc(sizeof(lv_color_t) * screenWidth * screenHeight/GFX_FRAME_BUFFER_FRACTION , MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+#else
+    disp_draw_buf = (lv_color_t *) malloc(sizeof(lv_color_t) * screenWidth * screenHeight / GFX_FRAME_BUFFER_FRACTION);
+#endif
+    if (!disp_draw_buf) {
+        Serial.println("LVGL disp_draw_buf allocate failed!");
+    } else {
+        lv_disp_draw_buf_init(&draw_buf, disp_draw_buf, NULL, screenWidth * screenHeight / GFX_FRAME_BUFFER_FRACTION);
 
-    // The two PSRAM framebuffers ARE LVGL's draw buffers. full_refresh is required
-    // for direct-framebuffer double buffering.
-    lv_disp_draw_buf_init(&draw_buf, (lv_color_t *)fb0, (lv_color_t *)fb1, screenWidth * screenHeight);
+        /* Initialize the display */
+        lv_disp_drv_init(&disp_drv);
+        /* Change the following line to your display resolution */
+        disp_drv.hor_res = screenWidth;
+        disp_drv.ver_res = screenHeight;
+        disp_drv.flush_cb = my_disp_flush;
+        disp_drv.draw_buf = &draw_buf;
+        lv_disp_drv_register(&disp_drv);
 
-    lv_disp_drv_init(&disp_drv);
-    disp_drv.hor_res = screenWidth;
-    disp_drv.ver_res = screenHeight;
-    disp_drv.flush_cb = my_disp_flush;
-    disp_drv.draw_buf = &draw_buf;
-    disp_drv.full_refresh = 1;
-    lv_disp_drv_register(&disp_drv);
+        /* Initialize the (dummy) input device driver */
+        static lv_indev_drv_t indev_drv;
+        lv_indev_drv_init(&indev_drv);
+        indev_drv.type = LV_INDEV_TYPE_POINTER;
+        indev_drv.read_cb = my_touchpad_read;
+        lv_indev_t *indev    = lv_indev_drv_register(&indev_drv);
+        // debug pointer calibration:
+        lv_obj_t *cursor_img = lv_img_create(lv_scr_act());
+        lv_img_set_src(cursor_img, LV_SYMBOL_OK);
+        lv_indev_set_cursor(indev, cursor_img);
 
-    /* Initialize the input device driver */
-    static lv_indev_drv_t indev_drv;
-    lv_indev_drv_init(&indev_drv);
-    indev_drv.type = LV_INDEV_TYPE_POINTER;
-    indev_drv.read_cb = my_touchpad_read;
-    lv_indev_t *indev = lv_indev_drv_register(&indev_drv);
-    // debug pointer calibration:
-    lv_obj_t *cursor_img = lv_img_create(lv_scr_act());
-    lv_img_set_src(cursor_img, LV_SYMBOL_OK);
-    lv_indev_set_cursor(indev, cursor_img);
+    }
 }
