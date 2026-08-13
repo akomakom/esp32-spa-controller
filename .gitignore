@@ -5,8 +5,6 @@
 # PlatformIO
 .pio/
 idf_component.yml
-# LVGL config is generated from display/lv_conf.h.example
-display/lv_conf.h
 # Display serial logs (local scratch)
 display/log
 display/log2
