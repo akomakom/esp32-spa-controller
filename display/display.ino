@@ -223,6 +223,7 @@ void initUI() {
 
     TRACE("UI 3");
     timeLabel = lv_label_create(top_thing);
+    lv_label_set_recolor(timeLabel, true);   // allow dimming the net-activity symbols
 //    lv_label_set_long_mode(timeLabel, LV_LABEL_LONG_WRAP);     /*Break the long lines*/
     lv_label_set_text(timeLabel, "?");
     lv_obj_set_width(timeLabel, LV_SIZE_CONTENT);  /*Set smaller width to make the lines wrap*/
@@ -526,11 +527,16 @@ void updateStatusBar(unsigned long frequency) {
                toDisplayTemp(lastServerStatus->water_temp), displayUnitChar());
       lv_label_set_text(bannerLabel, banner);
 
+      // Receive: steady dim symbol while the link is healthy (a message arrived within
+      // the last few seconds) instead of blinking on every 1s status. Send: brief dim
+      // flash on an actual send (rare, user-initiated). Both muted so they don't jar.
+      bool linkUp  = ESPNowUtils::lastMessageReceivedTime + 4000 > millis();
+      bool sending = ESPNowUtils::lastMessageSentTime + NET_ACTIVITY_SYMBOL_AGE > millis();
       lv_label_set_text_fmt(
               timeLabel,
-              "%s%s %02d:%02d",
-              ESPNowUtils::lastMessageReceivedTime + NET_ACTIVITY_SYMBOL_AGE > millis() ? LV_SYMBOL_DOWNLOAD : " ",
-              ESPNowUtils::lastMessageSentTime + NET_ACTIVITY_SYMBOL_AGE > millis() ? LV_SYMBOL_UPLOAD : " ",
+              "#3a4657 %s%s# %02d:%02d",
+              linkUp  ? LV_SYMBOL_DOWNLOAD : " ",
+              sending ? LV_SYMBOL_UPLOAD : " ",
               hour(now()),
               minute(now()));
     }
