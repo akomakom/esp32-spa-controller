@@ -16,55 +16,51 @@ To configure for different hardware, edit `gfx.h` and `touch.h`
 ![display-on.png](readme%2Fdisplay-on.png)
 ### Software
 
-#### Libraries Required
+This is a [PlatformIO](https://platformio.org/) project. All dependencies are declared in
+`platformio.ini` and fetched from the registry on the first build — nothing needs to be
+installed by hand.
 
-These can be installed using Arduino IDE.  Tested with versions listed.
+#### Dependencies
 
-* ESP32 Boards (3.1.3)
-* LVGL (8.4.0).  See setup steps below.
-* Arduino_GFX_Library (version 1.5.0)
-* XPT2046_Touchscreen (1.4.0) https://github.com/PaulStoffregen/XPT2046_Touchscreen,  or your touchscreen's driver.
-* Time https://github.com/PaulStoffregen/Time
+Fetched automatically from the PlatformIO registry (see `lib_deps` in `platformio.ini`):
 
+* `lvgl` — pinned to **8.3.11**
+* `Arduino_GFX` (moononournation) — **>= 1.6.7** (exposes the RGB-panel bounce-buffer size as a
+  constructor argument and handles PSRAM cache writeback, so no local patch is needed)
+* `Time` (paulstoffregen)
 
-#### LVGL Setup
+The one **vendored** library is `XPT2046_Touchscreen`, under `lib/` (PlatformIO auto-includes
+the project `lib/` directory). It is kept in-tree because it carries a one-line local patch —
+the SPI clock is lowered to 500 kHz so the resistive-touch ADC settles and reads linearly on
+this panel. Because `lib/` lives inside the source dir, `platformio.ini` uses
+`build_src_filter = +<*> -<lib/>` so it is compiled once (as a library) rather than twice.
 
-LVGL needs to be configured at the system level as follows
+#### LVGL config
 
-**Note** you should repeat this step every time you upgrade `lvgl`, as the defaults vary between versions.
+`lv_conf.h` is committed in this directory and found at build time via
+`-I${PROJECT_DIR} -DLV_CONF_INCLUDE_SIMPLE` in `platformio.ini`, so there is no setup step.
+If you ever change the pinned `lvgl` version, regenerate it from that version's
+`lv_conf_template.h` (LVGL's options drift between releases) and keep the project-specific
+settings, notably:
 
-##### Option A
+```c++
+#define LV_COLOR_DEPTH        16
+#define LV_TICK_CUSTOM        1
+#define LV_FONT_MONTSERRAT_24 1   // card values / dialog text
+#define LV_FONT_MONTSERRAT_40 1   // large setpoint number
+```
 
-**A working lv_conf.h example** for LVGL version mentioned above is included in this directory and can be copied to ~/Arduino/libraries/
-
-##### Option B
-
-1. Copy `~/Arduino/libraries/lvgl/lv_conf_template.h` to `~/Arduino/libraries/lv_conf.h` (not a typo, copied to libraries dir)
-2. Edit as follows:
-3. Change "if 0" at the top to "if 1"
-4. You may need to experiment with `LV_MEM_CUSTOM` (or not).  The following settings work for `LV_MEM_CUSTOM 0` if you need it.
-   ```c++
-   #define LV_MEM_SIZE (96U * 1024U)
-   #define LV_MEM_POOL_INCLUDE <esp32-hal-psram.h>
-   #define LV_MEM_POOL_ALLOC ps_malloc
-   ```
-5. Turn these on:
-    ```c++
-   #define LV_TICK_CUSTOM 1   (no idea why)
-   #define LV_COLOR_16_SWAP 1 (possibly only useful for Squareline)
-   #define LV_SPRINTF_USE_FLOAT 1  (for temperature display)
-   #define LV_FONT_MONTSERRAT_20 1 (for larger fonts)
-   #define LV_FONT_MONTSERRAT_40 1 (even larger fonts)
-   ```
+Note: `LV_SPRINTF_USE_FLOAT` is left **0**, so `%f` must not be passed to
+`lv_label_set_text_fmt` — the code formats temperatures with `snprintf`/integers instead.
 
 #### Building
-Makefile is provided for building on *nix systems using command-line tools (eg `arduino-cli`).
-See overridable defaults at the top of the `Makefile`.
 
-Typical usage (once tooling is set up) is:
 ```shell
-# compile, upload, then start serial monitor
-make upload monitor
-make upload monitor PORT=/dev/ttyUSB3 # change port from the default in the Makefile.  
+cd display
+pio run -t upload        # compile + flash
+pio device monitor       # serial console
+pio run -t upload --upload-port /dev/ttyUSB1   # override the port from platformio.ini
 ```
-If building on windows, review Makefiles and perform steps manually.
+
+The legacy `arduino-cli` `Makefile` is still present and works, but PlatformIO is the maintained
+path (it pins the versions above and needs no global `~/Arduino/libraries` setup).

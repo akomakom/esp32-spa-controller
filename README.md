@@ -26,25 +26,56 @@ This is work-in-progress.
 * Simple controls use single relays
 * 2-speed controls use two SPDT relays (1 for on, 2 for speed), wired in series.
 
+### Repository layout
+
+The project is two independent boards, each its own [PlatformIO](https://platformio.org/) project:
+
+* `controller/` — the ESP32 that drives the relays and sensors and serves the web UI.
+* `display/` — an optional Sunton "CYD" touchscreen remote (ESP32-S3) that talks to the
+  controller over ESP-NOW.
+
+Shared message/type definitions live in `hot_tub_types.h` at the repo root and are pulled
+into both projects via the include path (`-I..` in each `platformio.ini`), so there are no
+header copies or symlinks to maintain.
+
+### Build system
+
+Both boards build with [PlatformIO](https://platformio.org/) (`pio`). All dependencies are
+declared in each project's `platformio.ini` and fetched from the PlatformIO registry at build
+time — nothing large is vendored in git. The one exception is `XPT2046_Touchscreen`, kept under
+`display/lib/` because it carries a small local patch (see below).
+
+The original `arduino-cli` Makefiles are still present and work, but PlatformIO is the
+maintained path; it pins library versions and removes the old shared-header symlink hack.
+
 ### Installation on a new ESP32
 
-1. Copy secrets.h.sample to secrets.h and edit for your settings
+1. Copy `secrets.h.sample` to `secrets.h` and edit for your settings.
 
 #### Controller
 
-In `controller/` subdirectory:
+```shell
+cd controller
+pio run -t upload      # build + flash the firmware
+pio run -t uploadfs    # upload the web UI (data/) to SPIFFS — once, and after UI changes
+pio device monitor     # serial console
+```
 
-2. Build and upload the controller code using either:
-  * Arduino IDE (ensure you have ESP32 board support installed)
-  * arduino-cli, if installed (try `make upload`)
-3. Reboot the board and check that it's on the network and listening on port 80
-4. Upload the web interface using either:
-  * Arduino IDE: Use [this plugin](https://randomnerdtutorials.com/install-esp32-filesystem-uploader-arduino-ide/)
-  * Command Line: try `make upload-spiffs-via-http`
+The web UI is a single self-contained `data/index.html` (no CDN/jQuery), so it works offline on
+the controller's own AP. Firmware/filesystem/WiFi endpoints are behind HTTP Basic auth. See
+[controller/README.md](controller%2FREADME.md) for details, credentials, and the legacy `make`
+targets.
 
-See [README.md](controller%2FREADME.md) in that directory
+#### Display (optional touchscreen remote)
 
-#### Display
+```shell
+cd display
+pio run -t upload
+pio device monitor
+```
 
-Instructions are similar to Controller
-See [README.md](display%2FREADME.md) in that directory
+`lvgl` and `Arduino_GFX` come from the registry via `platformio.ini`; only `XPT2046_Touchscreen`
+is vendored (under `display/lib/`, auto-included by PlatformIO). The LVGL build config
+(`display/lv_conf.h`) is committed, so no setup step is needed — but if you change the pinned
+`lvgl` version, regenerate it from that version's `lv_conf_template.h`. Pin/panel/touch
+configuration lives in `gfx.h` and `touch.h`. See [display/README.md](display%2FREADME.md).

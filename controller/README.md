@@ -7,17 +7,29 @@ Any ESP32 with enough pins to drive relays should work.  A pre-integrated dev bo
 ### Software Installation 
 #### Libraries
 
-* Arduino_JSON (Benoit Blanchon)
-* OneWire
-* DallasTemperature
+With PlatformIO these are fetched automatically from the registry (see `lib_deps` in
+`platformio.ini`); with the Arduino IDE, install them by hand:
+
+* ArduinoJson (bblanchon)
+* DallasTemperature (milesburton)
+* OneWire (paulstoffregen)
+* Time (paulstoffregen)
 
 #### Binary
 
 Two supported build paths:
 
-* **arduino-cli** (original): `make upload monitor`
 * **PlatformIO** (recommended, pins library versions and needs no header symlinks):
-  `cd controller && pio run -t upload && pio device monitor`
+  ```shell
+  cd controller
+  pio run -t upload      # build + flash
+  pio device monitor     # serial console
+  ```
+* **arduino-cli** (original/legacy): `make upload monitor`
+
+Note: the controller board (`esp32dev`, `/dev/ttyUSB0` by default) does not auto-enter the
+bootloader on some USB-serial adapters — hold BOOT / tap EN before `pio run -t upload` if the
+upload fails to start.
 
 #### Web UI
 
