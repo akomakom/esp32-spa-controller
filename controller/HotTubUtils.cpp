@@ -374,8 +374,11 @@ void SensorBasedControl::setSetpoint(u_int8_t value) {
 }
 
 void SensorBasedControl::applyUserValue(time_t relStart, time_t relEnd, u_int8_t value) {
-    // Ignore the time window: a sensor setpoint is persistent, not a timed override.
-    setSetpoint(value);
+    // Temporary setpoint override for the given window; when it expires the heater
+    // reverts to the scheduled setpoint (normalValueOn) — same model as other
+    // controls, so the display shows a countdown (ORT). The persistent/scheduled
+    // setpoint is configured from the web schedule dialog (normalValueOn).
+    scheduleOverride(now() + relStart, now() + relEnd, value);
 }
 
 

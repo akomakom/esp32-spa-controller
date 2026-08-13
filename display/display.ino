@@ -299,6 +299,20 @@ void createSensorBasedDialog() {
     lv_obj_set_grid_align(sensorBasedControlPanel, LV_GRID_ALIGN_SPACE_BETWEEN, LV_GRID_ALIGN_SPACE_BETWEEN);
     TRACE("mbox 1.5");
 
+    // dark button style for this dialog (theme default fills buttons cyan -> looks blue)
+    static lv_style_t styleDialogBtn;
+    static bool dlgBtnStyleInit = false;
+    if (!dlgBtnStyleInit) {
+        dlgBtnStyleInit = true;
+        lv_style_init(&styleDialogBtn);
+        lv_style_set_bg_color(&styleDialogBtn, lv_color_hex(0x24344a));
+        lv_style_set_bg_opa(&styleDialogBtn, LV_OPA_COVER);
+        lv_style_set_border_width(&styleDialogBtn, 0);
+        lv_style_set_shadow_width(&styleDialogBtn, 0);
+        lv_style_set_radius(&styleDialogBtn, 10);
+        lv_style_set_text_color(&styleDialogBtn, lv_color_hex(0xe8f1f8));
+    }
+
     sensorBasedControlDescription = lv_label_create(sensorBasedControlPanel);
     //lv_obj_set_style_text_align(sensorBasedControlDescription, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_grid_cell(sensorBasedControlDescription, LV_GRID_ALIGN_STRETCH, 0, 3, LV_GRID_ALIGN_STRETCH, 0, 1);
@@ -322,6 +336,7 @@ void createSensorBasedDialog() {
     // + Button
     lv_obj_t * btn = lv_btn_create(sensorBasedControlPanel);
     lv_obj_set_size(btn, h, h);
+    lv_obj_add_style(btn, &styleDialogBtn, 0);
     lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_PLUS, 0);
     lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_SHORT_CLICKED,        &sensorBasedControlPanelIncrement);
     lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_LONG_PRESSED_REPEAT,  &sensorBasedControlPanelIncrement);
@@ -333,6 +348,7 @@ void createSensorBasedDialog() {
     // - Button
     btn = lv_btn_create(sensorBasedControlPanel);
     lv_obj_set_size(btn, h, h);
+    lv_obj_add_style(btn, &styleDialogBtn, 0);
     lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_MINUS, 0);
     lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_SHORT_CLICKED,        &sensorBasedControlPanelDecrement);
     lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_LONG_PRESSED_REPEAT,  &sensorBasedControlPanelDecrement);
@@ -343,6 +359,7 @@ void createSensorBasedDialog() {
     // OK / Apply Button (right column)
     btn = lv_btn_create(sensorBasedControlPanel);
     lv_obj_set_size(btn, h, h);
+    lv_obj_add_style(btn, &styleDialogBtn, 0);
     lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_set_grid_cell(btn, LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
 
@@ -356,6 +373,7 @@ void createSensorBasedDialog() {
     // Revert Button
     btn = lv_btn_create(sensorBasedControlPanel);
     lv_obj_set_size(btn, h, h);
+    lv_obj_add_style(btn, &styleDialogBtn, 0);
 //    lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_CLOSE, 0);
     lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_CLICKED, &sensorBasedControlPanelReset);
     lv_obj_set_grid_cell(btn, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
@@ -369,6 +387,7 @@ void createSensorBasedDialog() {
     // Close Button (left column)
     btn = lv_btn_create(sensorBasedControlPanel);
     lv_obj_set_size(btn, h, h);
+    lv_obj_add_style(btn, &styleDialogBtn, 0);
     lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_CLICKED, &sensorBasedControlPanelClose);
     lv_obj_set_grid_cell(btn, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
 
@@ -567,8 +586,8 @@ void dataReceivedControlStatus(struct_status_control *status) {
 static CardColors cardColorsFor(struct_status_control *s) {
     const uint32_t OFF_BG = 0x1a2431, OFF_BD = 0x2c3a4d, OFF_NAME = 0xc7d5e2, OFF_VAL = 0x5f7183;
     if (strcmp(s->type, "sensor-based") == 0) {
-        bool heating = s->e_value > 0;
-        return { 0x1a2431, (uint32_t)(heating ? 0x5a3420 : 0x3a2a1e), 0xc7d5e2, 0xff7a45 };
+        if (s->e_value > 0) return { 0xc23a30, 0xc23a30, 0xffffff, 0xffffff }; // heating (red)
+        return { OFF_BG, OFF_BD, 0xc7d5e2, 0xff7a45 };                         // idle: dark, warm setpoint
     }
     if (strcmp(s->type, "off-low-high") == 0) {
         if (s->e_value == 1) return { 0xe0952b, 0xe0952b, 0xffffff, 0xffffff }; // LOW  (amber)
@@ -811,8 +830,9 @@ static void lv_spinbox_event_cb(lv_event_t * e)
             // this is a confirm
             TRACE("SENS CB 3.1");
             TRACE("SENS CB 3.2");
-            showStatusMessage("Set %s to %.0f%c", status->name,
-                              toDisplayTemp((float)sensorBasedControlSetpointValue), displayUnitChar());
+            showStatusMessage("Set %s to %.0f%c for %d min", status->name,
+                              toDisplayTemp((float)sensorBasedControlSetpointValue), displayUnitChar(),
+                              status->DO / 60);
             TRACE("SENS CB 3.3");
             ESPNowUtils::sendOverrideCommand(
                     status->control_id,
