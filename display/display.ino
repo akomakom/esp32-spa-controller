@@ -120,16 +120,17 @@ void initUI() {
 
     mainScreen = lv_scr_act();
 
-    createSensorBasedDialog();
-
-    lv_scr_load(mainScreen);
-
-    // ---- Dark theme ----
+    // ---- Dark theme: apply BEFORE creating widgets so they all inherit it ----
     lv_disp_t *dispp = lv_disp_get_default();
     lv_theme_t *th = lv_theme_default_init(dispp,
         lv_color_hex(0x33bdef) /* primary (cyan) */, lv_color_hex(0xc23a30) /* secondary (red) */,
         true /* dark */, LV_FONT_DEFAULT);
     lv_disp_set_theme(dispp, th);
+
+    createSensorBasedDialog();
+
+    lv_scr_load(mainScreen);
+
     // Slate page background on both screens
     lv_obj_set_style_bg_color(mainScreen, lv_color_hex(0x0f1620), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(mainScreen, LV_OPA_COVER, LV_PART_MAIN);
@@ -339,16 +340,15 @@ void createSensorBasedDialog() {
 
 
     TRACE("mbox 5");
-    // Apply Button
+    // OK / Apply Button (right column)
     btn = lv_btn_create(sensorBasedControlPanel);
     lv_obj_set_size(btn, h, h);
-//    lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_OK, 0);
     lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_CLICKED, NULL);
-    lv_obj_set_grid_cell(btn, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
+    lv_obj_set_grid_cell(btn, LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
 
     lv_obj_t * btnLabel = lv_label_create(btn);
     lv_label_set_text(btnLabel, "OK");
-    //lv_obj_set_style_text_align(btnLabel, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_center(btnLabel);
 
 
 
@@ -362,20 +362,19 @@ void createSensorBasedDialog() {
 
     btnLabel = lv_label_create(btn);
     lv_label_set_text(btnLabel, "Revert");
-    //lv_obj_set_style_text_align(btnLabel, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_center(btnLabel);
 
 
     TRACE("mbox 7");
-    // Reset Button
+    // Close Button (left column)
     btn = lv_btn_create(sensorBasedControlPanel);
     lv_obj_set_size(btn, h, h);
-//    lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_CLOSE, 0);
     lv_obj_add_event_cb(btn, lv_spinbox_event_cb, LV_EVENT_CLICKED, &sensorBasedControlPanelClose);
-    lv_obj_set_grid_cell(btn, LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
+    lv_obj_set_grid_cell(btn, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
 
     btnLabel = lv_label_create(btn);
     lv_label_set_text(btnLabel, "Close");
-    //lv_obj_set_style_text_align(btnLabel, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_center(btnLabel);
 
     TRACE("mbox 8");
 }
