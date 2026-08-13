@@ -45,7 +45,7 @@
 // Calibrated 2026-08-12 from corner touches on this panel (raw X 181..2303, Y 658..3589).
 // X1=left edge (high raw x), X2=right edge; Y1=top edge (low raw y), Y2=bottom edge.
  #define TOUCH_MAP_X1 1800
- #define TOUCH_MAP_X2 300
+ #define TOUCH_MAP_X2 600
  #define TOUCH_MAP_Y1 660
  #define TOUCH_MAP_Y2 3590
 
