@@ -12,6 +12,9 @@
 #endif
 #include <vector>
 #include "ESPNowUtils.h"
+
+// Card colours for the dark theme (0xRRGGBB): background, border, name/value text.
+struct CardColors { uint32_t bg; uint32_t border; uint32_t nameC; uint32_t valueC; };
 /*******************************************************************************
  * Please configure the touch panel in touch.h
  ******************************************************************************/
@@ -121,6 +124,18 @@ void initUI() {
 
     lv_scr_load(mainScreen);
 
+    // ---- Dark theme ----
+    lv_disp_t *dispp = lv_disp_get_default();
+    lv_theme_t *th = lv_theme_default_init(dispp,
+        lv_color_hex(0x33bdef) /* primary (cyan) */, lv_color_hex(0xc23a30) /* secondary (red) */,
+        true /* dark */, LV_FONT_DEFAULT);
+    lv_disp_set_theme(dispp, th);
+    // Slate page background on both screens
+    lv_obj_set_style_bg_color(mainScreen, lv_color_hex(0x0f1620), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(mainScreen, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(sensorBasedControlPanel, lv_color_hex(0x0f1620), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(sensorBasedControlPanel, LV_OPA_COVER, LV_PART_MAIN);
+
     // style for button panel
     lv_style_init(&style);
     lv_style_set_flex_flow(&style, LV_FLEX_FLOW_ROW_WRAP);
@@ -143,8 +158,12 @@ void initUI() {
     lv_style_set_pad_bottom(&styleNoPadding, 0);
     lv_style_set_pad_left(&styleNoPadding, 0);
     lv_style_set_pad_right(&styleNoPadding, 0);
-    lv_style_set_pad_row(&styleNoPadding, 0);
-    lv_style_set_pad_column(&styleNoPadding, 0);
+    lv_style_set_pad_row(&styleNoPadding, 6);
+    lv_style_set_pad_column(&styleNoPadding, 6);
+    // transparent, borderless containers (let the slate page show through)
+    lv_style_set_bg_opa(&styleNoPadding, LV_OPA_TRANSP);
+    lv_style_set_border_width(&styleNoPadding, 0);
+    lv_style_set_radius(&styleNoPadding, 0);
     // requires enabling this font in lv_conf.h
     lv_style_set_text_font(&styleNoPadding, &lv_font_montserrat_24);
 
@@ -187,6 +206,8 @@ void initUI() {
     TRACE("UI 2");
     bannerLabel = lv_label_create(top_thing);
     lv_label_set_long_mode(bannerLabel, LV_LABEL_LONG_WRAP);     /*Break the long lines*/
+    lv_label_set_recolor(bannerLabel, true);                     /*allow #RRGGBB inline colour*/
+    lv_obj_set_style_text_font(bannerLabel, &lv_font_montserrat_24, LV_PART_MAIN);
     TRACE("UI 2.1");
     lv_label_set_text(bannerLabel, "Connecting");
     TRACE("UI 2.2");
@@ -482,8 +503,8 @@ void updateStatusBar(unsigned long frequency) {
 
       // LVGL's printf has float formatting disabled (LV_SPRINTF_USE_FLOAT 0), so build
       // the string with the standard library's snprintf (which supports %f) instead.
-      char banner[48];
-      snprintf(banner, sizeof(banner), "%s @%.1f%c ", lastServerStatus->server_name,
+      char banner[72];
+      snprintf(banner, sizeof(banner), "#8fa6b6 %s#   #33bdef %.1f%c#", lastServerStatus->server_name,
                toDisplayTemp(lastServerStatus->water_temp), displayUnitChar());
       lv_label_set_text(bannerLabel, banner);
 
@@ -543,6 +564,23 @@ void dataReceivedControlStatus(struct_status_control *status) {
 
 }
 
+// Card colours by control state (dark theme). e_value = getOnState (0/1/2).
+static CardColors cardColorsFor(struct_status_control *s) {
+    const uint32_t OFF_BG = 0x1a2431, OFF_BD = 0x2c3a4d, OFF_NAME = 0xc7d5e2, OFF_VAL = 0x5f7183;
+    if (strcmp(s->type, "sensor-based") == 0) {
+        bool heating = s->e_value > 0;
+        return { 0x1a2431, (uint32_t)(heating ? 0x5a3420 : 0x3a2a1e), 0xc7d5e2, 0xff7a45 };
+    }
+    if (strcmp(s->type, "off-low-high") == 0) {
+        if (s->e_value == 1) return { 0xe0952b, 0xe0952b, 0xffffff, 0xffffff }; // LOW  (amber)
+        if (s->e_value >= 2) return { 0xe0652b, 0xe0652b, 0xffffff, 0xffffff }; // HIGH (orange)
+        return { OFF_BG, OFF_BD, OFF_NAME, OFF_VAL };
+    }
+    // off-on
+    if (s->e_value > 0) return { 0xc23a30, 0xc23a30, 0xffffff, 0xffffff };       // ON (red)
+    return { OFF_BG, OFF_BD, OFF_NAME, OFF_VAL };                                // OFF
+}
+
 void updateButtons(unsigned long frequency) {
     static unsigned long last_update = 0;
     if ((millis() - last_update) > frequency) {
@@ -563,41 +601,30 @@ void updateButtons(unsigned long frequency) {
                   //TRACE("Update Buttons 2.04");
 
                   lv_obj_t *btn = lv_btn_create(singleControlContainer);
-                  //TRACE("Update Buttons 2.1");
-                  lv_obj_set_size(btn, 220, 68);
+                  lv_obj_set_size(btn, 150, 82);
                   lv_obj_align(btn, LV_ALIGN_BOTTOM_MID, 0, 0);
-                  //TRACE("Update Buttons 2.2");
-                  lv_obj_add_event_cb(btn, btn_event_cb, LV_EVENT_CLICKED,
-                                      controlStatuses[i]);
-                  lv_obj_set_style_border_width(btn, 3, LV_PART_MAIN | LV_STATE_DEFAULT);
-  //                TRACE("Update Buttons 2.3");
+                  lv_obj_add_event_cb(btn, btn_event_cb, LV_EVENT_CLICKED, controlStatuses[i]);
+                  lv_obj_set_style_radius(btn, 14, LV_PART_MAIN);
+                  lv_obj_set_style_border_width(btn, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+                  lv_obj_set_style_shadow_width(btn, 0, LV_PART_MAIN);
+                  lv_obj_set_style_pad_all(btn, 11, LV_PART_MAIN);
 
-
+                  // child 0: name (top-left)
                   lv_obj_t *label = lv_label_create(btn);
-                  lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 0);
-                  //TRACE("Update Buttons 2.4");
-                  lv_label_set_text_fmt(label, "%s", controlStatuses[i]->name);
-                  //TRACE("Update Buttons 2.5");
-                  lv_obj_center(label);
-  //                TRACE("Update Buttons 3");
+                  lv_obj_add_style(label, &styleSmallFont, LV_PART_MAIN);
+                  lv_obj_align(label, LV_ALIGN_TOP_LEFT, 0, 0);
+                  lv_label_set_text(label, controlStatuses[i]->name);
 
+                  // child 1: override-remaining chip (bottom-right, small)
                   lv_obj_t *labelORT = lv_label_create(btn);
-                  lv_obj_align(labelORT, LV_ALIGN_BOTTOM_LEFT, -10, 5);
                   lv_obj_add_style(labelORT, &styleSmallFont, LV_PART_MAIN);
-//                  lv_obj_set_style_border_color(labelORT, lv_palette_main(LV_PALETTE_GREY), LV_PART_MAIN);
-//                  lv_obj_set_style_border_width(labelORT, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
-                  lv_obj_set_style_text_color(labelORT, lv_palette_main(LV_PALETTE_ORANGE), LV_PART_MAIN);
-                  lv_obj_set_style_bg_color(labelORT, lv_color_white(), 0);
-                  lv_obj_set_style_bg_opa(labelORT, LV_OPA_50, 0);
-  //                TRACE("Update Buttons 3");
+                  lv_obj_align(labelORT, LV_ALIGN_BOTTOM_RIGHT, 0, 2);
 
+                  // child 2: value (bottom-left, large)
                   lv_obj_t *labelValue = lv_label_create(btn);
-                  lv_obj_align(labelValue, LV_ALIGN_TOP_RIGHT, 10, -5);
-                  lv_obj_add_style(labelValue, &styleSmallFont, LV_PART_MAIN);
+                  lv_obj_set_style_text_font(labelValue, &lv_font_montserrat_24, LV_PART_MAIN);
+                  lv_obj_align(labelValue, LV_ALIGN_BOTTOM_LEFT, 0, 0);
                   lv_label_set_text(labelValue, "");
-//                  lv_obj_set_style_border_color(labelValue, lv_palette_main(LV_PALETTE_GREY), LV_PART_MAIN);
-//                  lv_obj_set_style_border_width(labelValue, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
-                  lv_obj_set_style_text_color(labelValue, lv_palette_main(LV_PALETTE_AMBER), LV_PART_MAIN);
 
                   controlButtons.push_back(singleControlContainer);
               }
@@ -647,35 +674,26 @@ void updateButtons(unsigned long frequency) {
             showStatusMessage("No response for %s", status->name);
           }
         }
-        lv_obj_set_style_border_color(
-          btn,
-          pending ? lv_color_white() : lv_palette_main(MODE_COLORS[status->e_value]),
-          LV_PART_MAIN | LV_STATE_DEFAULT
-        );
+        CardColors cc = cardColorsFor(status);
+        lv_obj_set_style_bg_color(btn, lv_color_hex(cc.bg), LV_PART_MAIN);
+        lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_set_style_border_color(btn, pending ? lv_color_white() : lv_color_hex(cc.border), LV_PART_MAIN);
+        lv_obj_set_style_border_width(btn, pending ? 3 : 1, LV_PART_MAIN);
+        lv_obj_set_style_text_color(label, lv_color_hex(cc.nameC), LV_PART_MAIN);
+        lv_obj_set_style_text_color(labelValue, lv_color_hex(cc.valueC), LV_PART_MAIN);
+        lv_obj_set_style_text_color(labelORT, lv_color_hex(cc.valueC), LV_PART_MAIN);
         //TRACE("Update Buttons 5.2");
 
 
       if (strcmp(status->type, "off-low-high") == 0) {
-        if (status->e_value > 0) {
-//            TRACE("Update Buttons 5.4");
-//              lv_label_set_text_fmt(label, "%s (%s)", status->name, status->e_value == 1 ? "LOW" : "HIGH");
-          lv_label_set_text(labelValue, status->e_value == 1 ? "LOW" : "HIGH");
-          lv_obj_clear_flag(labelValue, LV_OBJ_FLAG_HIDDEN);
-        } else {
-          lv_label_set_text(labelValue, "OFF");
-          if (status->ORT <= 0) {  // if we're in override, show "OFF"
-            lv_obj_add_flag(labelValue, LV_OBJ_FLAG_HIDDEN);
-          }
-        }
-//            TRACE("Update Buttons 5.5");
-//              lv_led_set_color(led, lv_palette_main(status->e_value == 1 ? LV_PALETTE_RED : LV_PALETTE_YELLOW));
-
+        lv_label_set_text(labelValue, status->e_value == 0 ? "OFF" : (status->e_value == 1 ? "LOW" : "HIGH"));
       } else if (strcmp(status->type, "sensor-based") == 0) {
-//              lv_label_set_text_fmt(label, "%s (%d)", status->name, status->value);
         lv_label_set_text_fmt(labelValue, "%d%c", (int)lroundf(toDisplayTemp((float)status->value)), displayUnitChar());
       } else {
-        lv_label_set_text(label, status->name);
+        // off-on
+        lv_label_set_text(labelValue, status->e_value > 0 ? "ON" : "OFF");
       }
+      lv_obj_clear_flag(labelValue, LV_OBJ_FLAG_HIDDEN);
     }
   //    TRACE("Update Buttons 6");
   }
