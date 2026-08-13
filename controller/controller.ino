@@ -305,9 +305,9 @@ void sendStatus() {
 
         ESPNowUtils::outgoingStatusServer.time = mktime(main_device_time);
         ESPNowUtils::outgoingStatusServer.tz_offset = timezone_offset;
-        // Native unit is Celsius; the display converts for presentation.
-        ESPNowUtils::outgoingStatusServer.water_temp = spaStatus.temperatureUtils.getTempC(0);
-        ESPNowUtils::outgoingStatusServer.temp_unit = app_preferences.getUChar("temp_unit", 1);
+        // Native unit is Fahrenheit; the display converts for presentation.
+        ESPNowUtils::outgoingStatusServer.water_temp = spaStatus.temperatureUtils.getTempF(0);
+        ESPNowUtils::outgoingStatusServer.temp_unit = app_preferences.getUChar("temp_unit", 0);
         ESPNowUtils::outgoingStatusServer.control_count = spaStatus.controls.size();
         ESPNowUtils::outgoingStatusServer.touchscreen_timeout = 300;
 

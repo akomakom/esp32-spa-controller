@@ -465,10 +465,11 @@ void loop()
 // The controller stores/sends temperatures in Celsius and pushes the desired
 // display unit (0=F, 1=C) in the server status. Convert at presentation time only.
 bool displayInCelsius() {
-    return lastServerStatus == NULL || lastServerStatus->temp_unit != 0;
+    return lastServerStatus != NULL && lastServerStatus->temp_unit != 0;
 }
-float toDisplayTemp(float celsius) {
-    return displayInCelsius() ? celsius : (celsius * 9.0f / 5.0f + 32.0f);
+// Native unit is Fahrenheit; convert to Celsius only when that display unit is selected.
+float toDisplayTemp(float fahrenheit) {
+    return displayInCelsius() ? (fahrenheit - 32.0f) * 5.0f / 9.0f : fahrenheit;
 }
 char displayUnitChar() {
     return displayInCelsius() ? 'C' : 'F';

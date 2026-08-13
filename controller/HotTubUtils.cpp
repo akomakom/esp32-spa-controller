@@ -298,9 +298,9 @@ void TwoSpeedSpaControl::applyOutputs() {
 SensorBasedControl::SensorBasedControl(const char *name, u_int8_t pin, u_int8_t sensorIndex, u_int8_t swing, time_t postShutdownOnTime, TemperatureUtils* temps) : SpaControl(name, "sensor-based") {
     this->pin = pin;
     this->sensorIndex = sensorIndex;
-    // Default limits (native unit is Celsius):
+    // Default limits (native unit is Fahrenheit, better integer resolution):
     this->min = 0;
-    this->max = 40; // ~104F, a safe hot-tub ceiling
+    this->max = 104; // a safe hot-tub ceiling
     this->swing = swing;
     this->postShutdownOnTime = postShutdownOnTime;
     this->temperatureUtils = temps;
@@ -321,7 +321,7 @@ u_int8_t SensorBasedControl::getOnState() {
 
     // Delta to where we want to be, positive is too hot, negative is too cold:
     u_int8_t effectiveValue = getEffectiveValue();
-    float delta = temperatureUtils->getTempC(this->sensorIndex) - (float)effectiveValue;
+    float delta = temperatureUtils->getTempF(this->sensorIndex) - (float)effectiveValue;
     if (effectiveValue == max && delta >= 0) {
         // We must never exceed max, this is a safety feature.
         // An appliance may not be capable of going any higher and will be stuck ON forever
@@ -402,9 +402,9 @@ void SpaStatus::updateStatusString() {
         }
     }
 
-    // Native unit is Celsius; the web UI converts for display per "temp_unit".
-    jsonStatusMetrics["temp"] = temperatureUtils.getTempC(0);
-    jsonStatusMetrics["temp_unit"] = app_preferences.getUChar("temp_unit", 1);
+    // Native unit is Fahrenheit; the web UI converts for display per "temp_unit".
+    jsonStatusMetrics["temp"] = temperatureUtils.getTempF(0);
+    jsonStatusMetrics["temp_unit"] = app_preferences.getUChar("temp_unit", 0);
     jsonStatusMetrics["time"] = mktime(main_device_time);
     jsonStatusMetrics["uptime"] = esp_timer_get_time() / 1000000;
     serializeJson(jsonStatus, statusString);
@@ -426,11 +426,11 @@ SpaControl *SpaStatus::findByName(const char *name) {
 
 void SpaStatus::setup() {
 
-    // Defaults until UI configures these values (native unit is Celsius):
+    // Defaults until UI configures these values (native unit is Fahrenheit):
     pump->normalSchedule(50, 2, 1, 0);
-    // Always on; heat to a sane default setpoint (38C ~ 100F), keep above freezing
-    // (4C) when scheduled off. The setpoint is persistent and editable from the UI.
-    heater->normalSchedule(100, 1, 38, std::max(heater->min, (u_int8_t)4)); pump->neededBy(heater, 1, 1);
+    // Always on; heat to a sane default setpoint (100F), keep above freezing (40F)
+    // when scheduled off. The setpoint is persistent and editable from the UI.
+    heater->normalSchedule(100, 1, 100, std::max(heater->min, (u_int8_t)40)); pump->neededBy(heater, 1, 1);
     ozone->lockedTo(pump, SpaControlDependencies::SPECIAL_VALUE_ANY_GREATER_THAN_ZERO, 1);
 
     Serial.println("About to iterate and load settings");

@@ -28,11 +28,11 @@ void TemperatureUtils::readTemperatures() {
     sensors->requestTemperatures();
     Serial.print(" ... ");
 
-    //init cache (native unit is Celsius)
+    //init cache (native unit is Fahrenheit)
     for (u_int8_t i = 0 ; i < sensors->getDeviceCount(); i++) {
-        float temp = sensors->getTempCByIndex(i);
-        if (temp < MINIMUM_VALID_TEMP_C || temp > MAXIMUM_VALID_TEMP_C) {
-            Serial.print("Invalid temperature reading (C): ");
+        float temp = sensors->getTempFByIndex(i);
+        if (temp < MINIMUM_VALID_TEMP_F || temp > MAXIMUM_VALID_TEMP_F) {
+            Serial.print("Invalid temperature reading (F): ");
             Serial.println(temp);
         } else {
             temperatureCache[i] = temp;
@@ -117,9 +117,9 @@ void TemperatureUtils::loop() {
     }
 }
 
-float TemperatureUtils::getTempC(u_int8_t sensorIndex) {
+float TemperatureUtils::getTempF(u_int8_t sensorIndex) {
     return temperatureCache[sensorIndex];
 }
-float TemperatureUtils::getTempF(u_int8_t sensorIndex) {
-    return cToF(temperatureCache[sensorIndex]);
+float TemperatureUtils::getTempC(u_int8_t sensorIndex) {
+    return fToC(temperatureCache[sensorIndex]);
 }

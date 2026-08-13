@@ -244,7 +244,7 @@
 "use strict";
 (function () {
   var POLL_MS = 5000;
-  var unit = 1;            // 0 = F, 1 = C (from controller)
+  var unit = 0;            // 0 = F, 1 = C (from controller)
   var statusByName = {};   // latest control status keyed by name
   var pendingSetpoint = {};// name -> debounced setpoint state
 
@@ -252,8 +252,8 @@
 
   // ---- helpers ----
   function isC() { return unit === 1; }
-  function toDisplayTemp(c) { return isC() ? c : (c * 9 / 5 + 32); }         // native C -> display unit
-  function fromDisplayTemp(v) { return isC() ? v : (v - 32) * 5 / 9; }        // display unit -> native C
+  function toDisplayTemp(f) { return isC() ? (f - 32) * 5 / 9 : f; }          // native F -> display unit
+  function fromDisplayTemp(v) { return isC() ? (v * 9 / 5 + 32) : v; }        // display unit -> native F
   function unitLabel() { return isC() ? "°C" : "°F"; }
   function isTempControl(c) { return c && c.type === "sensor-based"; }
 

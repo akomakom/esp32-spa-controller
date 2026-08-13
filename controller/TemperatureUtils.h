@@ -22,9 +22,9 @@
 //seconds:
 #define TEMPERATURE_REQUEST_FREQUENCY 10
 
-// sanity checks (native unit is Celsius)
-#define MINIMUM_VALID_TEMP_C (-20)
-#define MAXIMUM_VALID_TEMP_C 60
+// sanity checks (native unit is Fahrenheit)
+#define MINIMUM_VALID_TEMP_F 1
+#define MAXIMUM_VALID_TEMP_F 120
 
 class SensorAddressMapping {
 public:
@@ -53,7 +53,7 @@ private:
 public:
     void setup();
     void loop();
-    // Native unit is Celsius. getTempF() converts for display convenience.
+    // Native unit is Fahrenheit. getTempC() converts for display convenience.
     float getTempC(u_int8_t sensorIndex);
     float getTempF(u_int8_t sensorIndex);
     float getTempFByID(u_int8_t id);
