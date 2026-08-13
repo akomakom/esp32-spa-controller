@@ -51,7 +51,14 @@ Arduino_ESP32RGBPanel *rgbpanel = new Arduino_ESP32RGBPanel(
 8 /* B0 */, 3 /* B1 */, 46 /* B2 */, 9 /* B3 */, 1 /* B4 */,
 0 /* hsync_polarity */, 1 /* hsync_front_porch */, 1 /* hsync_pulse_width */, 43 /* hsync_back_porch */,
 0 /* vsync_polarity */, 3 /* vsync_front_porch */, 1 /* vsync_pulse_width */, 12 /* vsync_back_porch */,
-1 /* pclk_active_neg */, 10000000 /* prefer_speed */);
+1 /* pclk_active_neg */, 10000000 /* prefer_speed */,
+false /* useBigEndian */, 0 /* de_idle_high */, 0 /* pclk_idle_high */,
+// Anti-flicker bounce buffer: the panel scans from fast internal SRAM (refilled
+// from PSRAM in the background) so brief PSRAM/flash stalls no longer starve
+// scan-out -> kills the intermittent horizontal frame shift. Size must divide
+// h_res*v_res: 480*34 = 16320, and (480*272)/16320 = 8. Arduino_GFX >=1.6.7 does
+// its own Cache_WriteBack after drawing, so no stale/double image without patches.
+(size_t)480 * 34 /* bounce_buffer_size_px */);
 
 Arduino_RGB_Display *gfx = new Arduino_RGB_Display(
 480 /* width */, 272 /* height */, rgbpanel, 0 /* rotation */, true /* auto_flush */);
