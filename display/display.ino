@@ -55,12 +55,19 @@ struct_status_server * lastServerStatus;
 std::vector<lv_obj_t *> controlButtons;
 std::vector<struct_status_control *> controlStatuses;
 lv_obj_t * controlButtonContainer = NULL;
+
+// Optimistic press feedback: acknowledge a press immediately (white border) until
+// the controller confirms via a status update whose value matches, or we time out.
+#define MAX_CONTROLS 16
+#define PRESS_PENDING_TIMEOUT 3000
+struct PressPending { bool active = false; unsigned long since = 0; u_int8_t expected = 0; };
+PressPending pressPending[MAX_CONTROLS];
 unsigned long statusDisplayTime = 0;
 
 // how long to keep last status message on the screen
 #define STATUS_DISPLAY_TIMEOUT 5000
 // how long to show the network activity symbols after network activity
-#define NET_ACTIVITY_SYMBOL_AGE 500
+#define NET_ACTIVITY_SYMBOL_AGE 100
 #endif
 
 
@@ -628,9 +635,20 @@ void updateButtons(unsigned long frequency) {
           lv_obj_add_flag(labelORT, LV_OBJ_FLAG_HIDDEN);
         }
 
+        // Optimistic feedback: white border while a press is unconfirmed.
+        u_int8_t cid = status->control_id;
+        bool pending = (cid < MAX_CONTROLS) && pressPending[cid].active;
+        if (pending) {
+          if (status->value != pressPending[cid].expected) {
+            pressPending[cid].active = false; pending = false;         // confirmed (value changed)
+          } else if (millis() - pressPending[cid].since > PRESS_PENDING_TIMEOUT) {
+            pressPending[cid].active = false; pending = false;         // gave up
+            showStatusMessage("No response for %s", status->name);
+          }
+        }
         lv_obj_set_style_border_color(
           btn,
-          lv_palette_main(MODE_COLORS[status->e_value]),
+          pending ? lv_color_white() : lv_palette_main(MODE_COLORS[status->e_value]),
           LV_PART_MAIN | LV_STATE_DEFAULT
         );
         //TRACE("Update Buttons 5.2");
@@ -701,6 +719,14 @@ static void btn_event_cb(lv_event_t * e)
                     overrideTime,
                     newValue
             );
+            // Acknowledge the press instantly, before the ESP-NOW round-trip completes.
+            // Confirm on value CHANGE (not a specific target) so cancel/revert also clears.
+            if (status->control_id < MAX_CONTROLS) {
+                pressPending[status->control_id].active = true;
+                pressPending[status->control_id].since = millis();
+                pressPending[status->control_id].expected = status->value; // value before the press
+            }
+            lv_obj_set_style_border_color(btn, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
         } else if (strcmp(status->type, "sensor-based") == 0) {
             TRACE("SENS DISP 1");
             lv_obj_set_user_data(sensorBasedControlSetpointLabel, status);
