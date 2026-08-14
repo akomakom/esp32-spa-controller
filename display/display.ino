@@ -70,7 +70,8 @@ unsigned long statusDisplayTime = 0;
 // how long to keep last status message on the screen
 #define STATUS_DISPLAY_TIMEOUT 5000
 // how long to show the network activity symbols after network activity
-#define NET_ACTIVITY_SYMBOL_AGE 100
+#define NET_ACTIVITY_SYMBOL_DOWNLOAD_AGE 4000
+#define NET_ACTIVITY_SYMBOL_UPLOAD_AGE 500
 #endif
 
 
@@ -549,12 +550,12 @@ void updateStatusBar(unsigned long frequency) {
       // Receive: steady dim symbol while the link is healthy (a message arrived within
       // the last few seconds) instead of blinking on every 1s status. Send: brief dim
       // flash on an actual send (rare, user-initiated). Both muted so they don't jar.
-      bool linkUp  = ESPNowUtils::lastMessageReceivedTime + 4000 > millis();
-      bool sending = ESPNowUtils::lastMessageSentTime + NET_ACTIVITY_SYMBOL_AGE > millis();
+      bool linkIsUp  = ESPNowUtils::lastMessageReceivedTime + NET_ACTIVITY_SYMBOL_DOWNLOAD_AGE > millis();
+      bool sending = ESPNowUtils::lastMessageSentTime + NET_ACTIVITY_SYMBOL_UPLOAD_AGE > millis();
       lv_label_set_text_fmt(
               timeLabel,
               "#3a4657 %s%s# %02d:%02d",
-              linkUp  ? LV_SYMBOL_DOWNLOAD : " ",
+              linkIsUp  ? LV_SYMBOL_DOWNLOAD : " ",
               sending ? LV_SYMBOL_UPLOAD : " ",
               hour(now()),
               minute(now()));
