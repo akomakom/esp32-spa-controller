@@ -222,6 +222,7 @@ u_int8_t SpaControl::getEffectiveValue() {
 }
 
 u_int8_t SpaControl::getOnState() {
+    if (spaWinterized) return 0; // forced off, ignoring schedules/overrides
     return getEffectiveValue();
 }
 
@@ -263,7 +264,7 @@ void SimpleSpaControl::toggle() {
 
 void SimpleSpaControl::applyOutputs() {
 //    Serial.printf("Applying outputs for %s", name);
-    digitalWrite(pin, getEffectiveValue() ? HIGH : LOW);
+    digitalWrite(pin, getOnState() ? HIGH : LOW); // getOnState() honors winterized mode
 }
 
 TwoSpeedSpaControl::TwoSpeedSpaControl(const char *name, u_int8_t pin_power, u_int8_t pin_speed) : SpaControl(name, "off-low-high") {
@@ -279,7 +280,7 @@ void TwoSpeedSpaControl::toggle() {
 
 void TwoSpeedSpaControl::applyOutputs() {
 //    Serial.printf("Applying outputs for %s", name);
-    switch (getEffectiveValue()) {
+    switch (getOnState()) { // getOnState() honors winterized mode (0 when winterized)
         case 0:
             digitalWrite(pinPower, 0);
             digitalWrite(pinSpeed, 0);
@@ -313,6 +314,7 @@ SensorBasedControl::SensorBasedControl(const char *name, u_int8_t pin, u_int8_t 
  * @return
  */
 u_int8_t SensorBasedControl::getOnState() {
+    if (spaWinterized) return 0; // forced off, ignoring the setpoint/schedule
     // Don't just flip/flop any time temperature is below threshold.
     // Instead:
     //  if currently off and we are colder than (threshold - swing), turn on
@@ -341,6 +343,7 @@ u_int8_t SensorBasedControl::getOnState() {
  * @return same as getOnState unless postShutdown delay is in effect
  */
 u_int8_t SensorBasedControl::getOnStateForDependents() {
+    if (spaWinterized) return 0; // forced off; don't hold dependents on via post-shutdown delay
     getOnState();
 
     if (slowFlipState == 1) {
@@ -408,6 +411,7 @@ void SpaStatus::updateStatusString() {
     // Native unit is Fahrenheit; the web UI converts for display per "temp_unit".
     jsonStatusMetrics["temp"] = temperatureUtils.getTempF(0);
     jsonStatusMetrics["temp_unit"] = app_preferences.getUChar("temp_unit", 0);
+    jsonStatusMetrics["winterized"] = spaWinterized;
     jsonStatusMetrics["time"] = mktime(main_device_time);
     jsonStatusMetrics["uptime"] = esp_timer_get_time() / 1000000;
     serializeJson(jsonStatus, statusString);

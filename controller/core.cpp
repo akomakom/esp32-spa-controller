@@ -6,3 +6,4 @@ extern const char * PREFERENCES_NAME = "hot-tub";
 extern Preferences app_preferences = Preferences();
 extern struct tm * main_device_time = (tm*) malloc(sizeof(tm));
 extern int timezone_offset = 0;
+extern bool spaWinterized = false;

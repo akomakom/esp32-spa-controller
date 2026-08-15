@@ -80,7 +80,11 @@ void ESPNowUtils::OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingDat
     lastMessageReceivedTime = millis();
     switch (type) {
         case CONTROL_STATUS :      // we received data from server
-            memcpy(&receivedControlStatus, incomingData, sizeof(receivedControlStatus));
+            // Bound the copy to what was actually received so a controller running an
+            // older/newer struct layout can't over-read; the target is a zero-initialized
+            // static, so any field absent from a shorter packet keeps its default.
+            memcpy(&receivedControlStatus, incomingData,
+                   (size_t)len < sizeof(receivedControlStatus) ? (size_t)len : sizeof(receivedControlStatus));
 //            Serial.printf(" ID  = %d, Control = %d, Value = %d\n",
 //              receivedControlStatus.board_id,
 //              receivedControlStatus.control_id,
@@ -88,7 +92,11 @@ void ESPNowUtils::OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingDat
             dataCallbackControl(&receivedControlStatus);
             break;
         case SERVER_STATUS:
-            memcpy(&receivedServerStatus, incomingData, sizeof(receivedServerStatus));
+            // Bound the copy to the received length (see CONTROL_STATUS note): an older
+            // controller that predates the `winterized` field sends a shorter packet, and
+            // the missing byte stays 0 rather than reading garbage past the buffer.
+            memcpy(&receivedServerStatus, incomingData,
+                   (size_t)len < sizeof(receivedServerStatus) ? (size_t)len : sizeof(receivedServerStatus));
 //            Serial.print("Received server status from ");
 //            Serial.println(receivedServerStatus.server_name);
             dataCallbackServer(&receivedServerStatus);

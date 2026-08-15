@@ -181,6 +181,10 @@ void setup(void) {
     if (!app_preferences.begin(PREFERENCES_NAME)) {
         Serial.println("Unable to open preferences");
     }
+    spaWinterized = app_preferences.getBool("winterized", false); // persists across reboots
+    if (spaWinterized) {
+        Serial.println("WINTERIZED mode is ON at boot: all controls forced off.");
+    }
 
     commandQueue = xQueueCreate(COMMAND_QUEUE_DEPTH, sizeof(struct_command));
 
@@ -233,6 +237,14 @@ void setup(void) {
         u_int8_t unit = (u_int8_t)server.arg("unit").toInt() ? 1 : 0;
         app_preferences.putUChar("temp_unit", unit);
         previousStatusSendTime = 0; // push the new unit to peers promptly
+        sendJSONResponse(WEB_RESPONSE_OK);
+    });
+    // Winterized mode: force all controls off (ignoring schedules), persisted across
+    // reboots and pushed to the display over ESP-NOW.
+    server.on("/winterize", HTTP_POST, []() {
+        spaWinterized = server.arg("on").toInt() ? true : false;
+        app_preferences.putBool("winterized", spaWinterized);
+        previousStatusSendTime = 0; // push the new state to peers promptly
         sendJSONResponse(WEB_RESPONSE_OK);
     });
     server.on("/configureControl", HTTP_GET, []() {
@@ -308,6 +320,7 @@ void sendStatus() {
         // Native unit is Fahrenheit; the display converts for presentation.
         ESPNowUtils::outgoingStatusServer.water_temp = spaStatus.temperatureUtils.getTempF(0);
         ESPNowUtils::outgoingStatusServer.temp_unit = app_preferences.getUChar("temp_unit", 0);
+        ESPNowUtils::outgoingStatusServer.winterized = spaWinterized ? 1 : 0;
         ESPNowUtils::outgoingStatusServer.control_count = spaStatus.controls.size();
         ESPNowUtils::outgoingStatusServer.touchscreen_timeout = 300;
 

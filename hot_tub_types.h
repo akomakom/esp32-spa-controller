@@ -33,6 +33,7 @@ typedef struct struct_status_server {
     u_int8_t control_count = 0;
     u_int16_t touchscreen_timeout = 0; // 0 is never
     u_int8_t temp_unit = 0; // display unit only: 0 = Fahrenheit, 1 = Celsius. Native storage is always Fahrenheit.
+    u_int8_t winterized = 0; // 1 = all controls forced off, schedules ignored
 } struct_status_server;
 
 typedef struct struct_status_control {

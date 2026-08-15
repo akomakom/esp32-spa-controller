@@ -542,9 +542,15 @@ void updateStatusBar(unsigned long frequency) {
 
       // LVGL's printf has float formatting disabled (LV_SPRINTF_USE_FLOAT 0), so build
       // the string with the standard library's snprintf (which supports %f) instead.
-      char banner[72];
-      snprintf(banner, sizeof(banner), "#8fa6b6 %s#   #33bdef %.1f%c#", lastServerStatus->server_name,
-               toDisplayTemp(lastServerStatus->water_temp), displayUnitChar());
+      char banner[96];
+      if (lastServerStatus->winterized) {
+          // Prominent red notice; still show the water temperature.
+          snprintf(banner, sizeof(banner), "#ff4d4d " LV_SYMBOL_WARNING " WINTERIZED#   #33bdef %.1f%c#",
+                   toDisplayTemp(lastServerStatus->water_temp), displayUnitChar());
+      } else {
+          snprintf(banner, sizeof(banner), "#8fa6b6 %s#   #33bdef %.1f%c#", lastServerStatus->server_name,
+                   toDisplayTemp(lastServerStatus->water_temp), displayUnitChar());
+      }
       lv_label_set_text(bannerLabel, banner);
 
       // Receive: steady dim symbol while the link is healthy (a message arrived within
