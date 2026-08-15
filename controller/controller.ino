@@ -252,16 +252,37 @@ void setup(void) {
         control->updateConfigJsonString();
         sendJSONResponse(control->configString);
     });
+    // Body: control=<name>, overrideDefaultDurationSeconds=<n>, and periods=<json array>
+    // e.g. periods=[{"startHour":0,"onMinutes":5,"cycleMinutes":15,"onValue":1,"offValue":0}, ...]
     server.on("/configureControl", HTTP_POST, []() {
         try {
             SpaControl *control = spaStatus.findByName(server.arg("control").c_str());
-            control->normalSchedule(
-                    (u_int8_t)server.arg("percentageOfDayOnTime").toInt(),
-                    (u_int8_t)server.arg("numberOfTimesToRun").toInt(),
-                    (u_int8_t)server.arg("normalValueOn").toInt(),
-                    (u_int8_t)server.arg("normalValueOff").toInt()
-            );
-            control->normalSettings.overrideDefaultDurationSeconds = (u_int32_t)server.arg("overrideDefaultDurationSeconds").toInt();
+
+            StaticJsonDocument<800> doc;
+            DeserializationError err = deserializeJson(doc, server.arg("periods"));
+            if (err) {
+                sendJSONResponse("Invalid periods JSON", 400);
+                return;
+            }
+            JsonArray arr = doc.as<JsonArray>();
+            SpaSchedulePeriod periods[MAX_SCHEDULE_PERIODS];
+            u_int8_t count = 0;
+            for (JsonObject o : arr) {
+                if (count >= MAX_SCHEDULE_PERIODS) break;
+                periods[count].startHour    = (u_int8_t) o["startHour"].as<int>();
+                periods[count].onMinutes    = (u_int16_t)o["onMinutes"].as<int>();
+                periods[count].cycleMinutes = (u_int16_t)o["cycleMinutes"].as<int>();
+                periods[count].onValue      = (u_int8_t) o["onValue"].as<int>();
+                periods[count].offValue     = (u_int8_t) o["offValue"].as<int>();
+                count++;
+            }
+            if (count >= 1) {
+                control->setSchedule(periods, count); // sorts, clamps, forces first to 00:00
+            }
+            if (server.hasArg("overrideDefaultDurationSeconds")) {
+                control->scheduleSettings.overrideDefaultDurationSeconds =
+                        (u_int32_t)server.arg("overrideDefaultDurationSeconds").toInt();
+            }
             control->persist();
             previousStatusSendTime = 0; // update others
             sendJSONResponse(WEB_RESPONSE_OK);
@@ -339,7 +360,7 @@ void sendStatus() {
             strcpy(ESPNowUtils::outgoingStatusControl.type, control->type);
             strcpy(ESPNowUtils::outgoingStatusControl.name, control->name);
             ESPNowUtils::outgoingStatusControl.ORT = control->getOverrideScheduleRemainingTime();
-            ESPNowUtils::outgoingStatusControl.DO = control->normalSettings.overrideDefaultDurationSeconds;
+            ESPNowUtils::outgoingStatusControl.DO = control->scheduleSettings.overrideDefaultDurationSeconds;
             ESPNowUtils::outgoingStatusControl.EL = control->getOverrideScheduleElapsedTime();
 
             ESPNowUtils::outgoingStatusControl.value = control->getEffectiveValue();

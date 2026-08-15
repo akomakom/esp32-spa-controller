@@ -699,12 +699,20 @@ void updateButtons(unsigned long frequency) {
         lv_obj_t * labelValue = lv_obj_get_child(btn, 2);
 
         if (status->ORT > 0) {
-          if (status->ORT > 3600) {
-            lv_label_set_text_fmt(labelORT, "%dh", status->ORT / 3600);
-          } else if (status->ORT > 60) {
-            lv_label_set_text_fmt(labelORT, "%dm", status->ORT / 60);
+          // Show hours + minutes so a long override reads accurately while counting
+          // down (e.g. 1h58m) instead of a coarse "1h" for the whole second hour.
+          u_int32_t ort = status->ORT;
+          if (ort >= 3600) {
+            int h = (int)(ort / 3600), m = (int)((ort % 3600) / 60);
+            if (m > 0) {
+              lv_label_set_text_fmt(labelORT, "%dh%02dm", h, m);
+            } else {
+              lv_label_set_text_fmt(labelORT, "%dh", h);
+            }
+          } else if (ort >= 60) {
+            lv_label_set_text_fmt(labelORT, "%dm", (int)(ort / 60));
           } else {
-            lv_label_set_text_fmt(labelORT, "%ds", status->ORT);
+            lv_label_set_text_fmt(labelORT, "%ds", (int)ort);
           }
 //            lv_arc_set_value(arc, 100 *  status->EL / (status->ORT + status->EL));
           lv_obj_clear_flag(labelORT, LV_OBJ_FLAG_HIDDEN);

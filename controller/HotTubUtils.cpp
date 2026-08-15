@@ -60,49 +60,95 @@ SpaControl *SpaControlDependencies::getDependentControl() {
 void
 SpaControlScheduler::normalSchedule(u_int8_t percentageOfDayOnTime, u_int8_t numberOfTimesToRun, u_int8_t normalValueOn,
                                     u_int8_t normalValueOff) {
+    // Convenience: express the old whole-day "% + segments" schedule as a single
+    // time-of-day period (00:00 -> midnight). Used for code defaults and any caller
+    // that still thinks in the old terms.
     checkBounds(normalValueOn);
     checkBounds(normalValueOff);
-    normalSettings.percentageOfDayOnTime = std::max(0, std::min(100, (int)percentageOfDayOnTime));
-    normalSettings.numberOfTimesToRun = std::max(1, (int)numberOfTimesToRun);
-    normalSettings.normalValueOn = normalValueOn;
-    normalSettings.normalValueOff = normalValueOff;
+    int pct = std::max(0, std::min(100, (int)percentageOfDayOnTime));
+    int segments = std::max(1, (int)numberOfTimesToRun);
 
-    // precalculate normal schedule variables
-    float onLengthPercentage = (float)normalSettings.percentageOfDayOnTime / (float)normalSettings.numberOfTimesToRun;
-    float offLengthPercentage = (float)(100 - normalSettings.percentageOfDayOnTime) / (float)normalSettings.numberOfTimesToRun;
-    onOffLengthPercentage = onLengthPercentage + offLengthPercentage;
-    // how ON compares with OFF (how far is the divider), as a 0-1 fraction, <0.5 is on, >0.5 is off
-    onVsOff = onLengthPercentage / onOffLengthPercentage;
+    SpaSchedulePeriod p;
+    p.startHour = 0;
+    p.cycleMinutes = (u_int16_t)std::max(1, 1440 / segments);
+    p.onMinutes = (u_int16_t)((long)p.cycleMinutes * pct / 100);
+    p.onValue = normalValueOn;
+    p.offValue = normalValueOff;
+    setSchedule(&p, 1);
+}
 
+void SpaControlScheduler::setSchedule(const SpaSchedulePeriod* newPeriods, u_int8_t count) {
+    if (count < 1) count = 1;
+    if (count > MAX_SCHEDULE_PERIODS) count = MAX_SCHEDULE_PERIODS;
+
+    SpaSchedulePeriod tmp[MAX_SCHEDULE_PERIODS];
+    for (u_int8_t i = 0; i < count; i++) {
+        tmp[i] = newPeriods[i];
+        if (tmp[i].startHour > 23) tmp[i].startHour = 23;
+        if (tmp[i].cycleMinutes < 1) tmp[i].cycleMinutes = 1;
+        if (tmp[i].cycleMinutes > 1440) tmp[i].cycleMinutes = 1440;
+        if (tmp[i].onMinutes > 1440) tmp[i].onMinutes = 1440;
+        tmp[i].onValue  = std::min(max, std::max(min, tmp[i].onValue));
+        tmp[i].offValue = std::min(max, std::max(min, tmp[i].offValue));
+    }
+    // sort by startHour ascending (tiny insertion sort)
+    for (u_int8_t i = 1; i < count; i++) {
+        SpaSchedulePeriod v = tmp[i];
+        int j = i;
+        while (j > 0 && tmp[j - 1].startHour > v.startHour) { tmp[j] = tmp[j - 1]; j--; }
+        tmp[j] = v;
+    }
+    tmp[0].startHour = 0; // the first period always covers from midnight
+
+    scheduleSettings.version = SCHEDULE_SETTINGS_VERSION;
+    scheduleSettings.periodCount = count;
+    for (u_int8_t i = 0; i < count; i++) scheduleSettings.periods[i] = tmp[i];
+}
+
+u_int8_t SpaControlScheduler::getCurrentPeriodIndex() {
+    long secsToday = main_device_time->tm_hour * 3600L + main_device_time->tm_min * 60L + main_device_time->tm_sec;
+    u_int8_t idx = 0;
+    for (u_int8_t i = 0; i < scheduleSettings.periodCount; i++) {
+        if ((long)scheduleSettings.periods[i].startHour * 3600L <= secsToday) {
+            idx = i;
+        } else {
+            break; // periods are sorted by startHour; nothing later can match
+        }
+    }
+    return idx;
 }
 
 void SpaControlScheduler::persist(const char* eepromKey) {
-    // persist this to EEPROM
-    if (!app_preferences.putBytes(eepromKey, &normalSettings, sizeof(normalSettings))) {
-        Serial.print("Unable to persist setting to key: ");
+    scheduleSettings.version = SCHEDULE_SETTINGS_VERSION;
+    if (!app_preferences.putBytes(eepromKey, &scheduleSettings, sizeof(scheduleSettings))) {
+        Serial.print("Unable to persist schedule to key: ");
         Serial.println(eepromKey);
     } else {
-        Serial.print("Persisted setting to key: ");
+        Serial.print("Persisted schedule to key: ");
         Serial.println(eepromKey);
     }
 }
 void SpaControlScheduler::load(const char* eepromKey) {
-
-    Serial.print("Retrieving values from eeprom for key");
-    Serial.println(eepromKey);
-
-    if (app_preferences.getBytes(eepromKey, &normalSettings, sizeof(normalSettings))) {
-        // apply so that math can be precalculated
-        Serial.print("Retrieved values from eeprom, eg: ");
-        Serial.println(normalSettings.percentageOfDayOnTime);
-        // Clamp persisted values into the current [min,max] range before applying.
-        // Ranges can change between firmware versions (e.g. the F->C switch dropped the
-        // heater ceiling from 104 to 40); without this, normalSchedule()'s checkBounds()
-        // would throw on boot and abort.
-        normalSettings.normalValueOn  = std::min(max, std::max(min, normalSettings.normalValueOn));
-        normalSettings.normalValueOff = std::min(max, std::max(min, normalSettings.normalValueOff));
-        // apply the settings to precalculate other non-persisted variables
-        normalSchedule(normalSettings.percentageOfDayOnTime, normalSettings.numberOfTimesToRun, normalSettings.normalValueOn, normalSettings.normalValueOff);
+    // Read into a local and only adopt it if it is a full, current-version record.
+    // Anything else (absent, or an older/short layout from a previous firmware) leaves
+    // the code defaults in place -- this version intentionally does not migrate old
+    // saved schedules; the user reconfigures via the new period editor.
+    SpaScheduleSettings loaded;
+    size_t got = app_preferences.getBytes(eepromKey, &loaded, sizeof(loaded));
+    if (got == sizeof(loaded) && loaded.version == SCHEDULE_SETTINGS_VERSION
+            && loaded.periodCount >= 1 && loaded.periodCount <= MAX_SCHEDULE_PERIODS) {
+        scheduleSettings = loaded;
+        // Clamp persisted values into the current [min,max] range (ranges can change
+        // between firmware versions, e.g. the heater ceiling) so nothing trips later.
+        for (u_int8_t i = 0; i < scheduleSettings.periodCount; i++) {
+            scheduleSettings.periods[i].onValue  = std::min(max, std::max(min, scheduleSettings.periods[i].onValue));
+            scheduleSettings.periods[i].offValue = std::min(max, std::max(min, scheduleSettings.periods[i].offValue));
+        }
+        Serial.print("Loaded schedule from key: ");
+        Serial.println(eepromKey);
+    } else {
+        Serial.print("No current-version schedule for key (keeping defaults): ");
+        Serial.println(eepromKey);
     }
 }
 
@@ -128,28 +174,21 @@ void SpaControlScheduler::checkBounds(u_int8_t value) {
 }
 
 u_int8_t SpaControlScheduler::getScheduledValue() {
+    // Find the current time-of-day period, then apply its cycle: ON for the first
+    // onMinutes of each cycleMinutes window (measured from the period's start).
+    SpaSchedulePeriod& p = scheduleSettings.periods[getCurrentPeriodIndex()];
 
-    // trust normal schedule.
-    // Normal schedule if a series of on-off time segments configured as a percentage of a day's length
-
-    // Percentage of each on and off segment:
-    // TODO: precalculate on normalSchedule() call
-    // length of each unit as a percentage of day length
-
-    // How far are we into the day (since midnight), in percentages?
-    long elapsedSecsToday = main_device_time->tm_hour * 3600 + main_device_time->tm_min * 60 + main_device_time->tm_sec;
-    float currentPercentageOfDay = (float)100 * elapsedSecsToday / 86400; // seconds per day
-//    Serial.print("Current percentage of day: ");
-//    Serial.println(currentPercentageOfDay);
-    // which segment are we in currently?
-    // how many on+off time units into the day are we?
-    // eg we are 2.36 on/off segments into the day
-    float onOffUnitCount = currentPercentageOfDay / onOffLengthPercentage;
-    float fractionOfOnOffUnit =  onOffUnitCount-(long)onOffUnitCount; //leave fraction only, eg 0.36
-
-    // Are we past the on->off divider in this on-then-off time unit?
-    // note that the = in >= prevents a midnight blip when everything turns on for a second (0=0)
-    return (fractionOfOnOffUnit >= onVsOff) ? normalSettings.normalValueOff : normalSettings.normalValueOn;
+    if (p.cycleMinutes == 0 || p.onMinutes >= p.cycleMinutes) {
+        return p.onValue;   // always on for this period
+    }
+    if (p.onMinutes == 0) {
+        return p.offValue;  // always off for this period
+    }
+    long secsToday = main_device_time->tm_hour * 3600L + main_device_time->tm_min * 60L + main_device_time->tm_sec;
+    long minsIntoPeriod = (secsToday - (long)p.startHour * 3600L) / 60L;
+    if (minsIntoPeriod < 0) minsIntoPeriod = 0;
+    long pos = minsIntoPeriod % p.cycleMinutes;
+    return (pos < p.onMinutes) ? p.onValue : p.offValue;
 }
 
 bool SpaControlScheduler::isOverrideScheduleEnabled() {
@@ -176,11 +215,21 @@ time_t SpaControlScheduler::getOverrideScheduleElapsedTime() {
 
 
 void SpaControlScheduler::updateConfigJsonString() {
-    jsonConfig["percentageOfDayOnTime"] = normalSettings.percentageOfDayOnTime;
-    jsonConfig["numberOfTimesToRun"] = normalSettings.numberOfTimesToRun;
-    jsonConfig["normalValueOn"] = normalSettings.normalValueOn;
-    jsonConfig["normalValueOff"] = normalSettings.normalValueOff;
-    jsonConfig["overrideDefaultDurationSeconds"] = normalSettings.overrideDefaultDurationSeconds;
+    jsonConfig.clear();
+    jsonConfig["overrideDefaultDurationSeconds"] = scheduleSettings.overrideDefaultDurationSeconds;
+    jsonConfig["min"] = min;
+    jsonConfig["max"] = max;
+    jsonConfig["maxPeriods"] = MAX_SCHEDULE_PERIODS;
+    jsonConfig["gated"] = dependencyGatedBySchedule; // ozone: schedule arms, not runs
+    JsonArray periods = jsonConfig.createNestedArray("periods");
+    for (u_int8_t i = 0; i < scheduleSettings.periodCount; i++) {
+        JsonObject o = periods.createNestedObject();
+        o["startHour"]    = scheduleSettings.periods[i].startHour;
+        o["onMinutes"]    = scheduleSettings.periods[i].onMinutes;
+        o["cycleMinutes"] = scheduleSettings.periods[i].cycleMinutes;
+        o["onValue"]      = scheduleSettings.periods[i].onValue;
+        o["offValue"]     = scheduleSettings.periods[i].offValue;
+    }
     serializeJson(jsonConfig, configString);
 }
 
@@ -196,7 +245,7 @@ void SpaControl::toggle() {
     scheduleOverride(
             now(),
             now() + ((getOverrideScheduleRemainingTime() > 0) ?
-                getOverrideScheduleRemainingTime() : normalSettings.overrideDefaultDurationSeconds),
+                getOverrideScheduleRemainingTime() : scheduleSettings.overrideDefaultDurationSeconds),
             getNextValue());
 //    Serial.println("PARENT!!! Value after toggle is ");
 //    Serial.println(getEffectiveValue());
@@ -214,6 +263,17 @@ u_int8_t SpaControl::getEffectiveValue() {
     }
 //    Serial.printf("GetEffectiveValue 2 %s\n", name);
     u_int8_t dependencyValue = getDependencyValue();
+    if (dependencyGatedBySchedule) {
+        // The schedule only ARMS this control (e.g. ozone): it turns on solely when its
+        // dependency (the pump) is active AND its own schedule is on for this period. It
+        // is never turned on by the schedule alone -- an armed-but-pump-off period is off,
+        // and an unarmed period is off even while the pump runs.
+        if (dependencyValue != SpaControlDependencies::SPECIAL_RETURN_VALUE_NOT_IN_EFFECT
+                && getScheduledValue() > 0) {
+            return dependencyValue;
+        }
+        return 0;
+    }
     if (dependencyValue != SpaControlDependencies::SPECIAL_RETURN_VALUE_NOT_IN_EFFECT) {
         return dependencyValue;
     }
@@ -364,13 +424,13 @@ void SensorBasedControl::applyOutputs() {
 }
 
 void SensorBasedControl::setSetpoint(u_int8_t value) {
-    // The setpoint is the "on" value of the normal schedule. Persist it so it
-    // survives the override window and reboots.
+    // A single "master" setpoint: apply it as the on-value of every scheduled period
+    // (per-period setpoints are edited through the schedule editor instead). Persist so
+    // it survives the override window and reboots.
     value = std::min(max, std::max(min, value));
-    normalSchedule(normalSettings.percentageOfDayOnTime,
-                   normalSettings.numberOfTimesToRun,
-                   value,
-                   normalSettings.normalValueOff);
+    for (u_int8_t i = 0; i < scheduleSettings.periodCount; i++) {
+        scheduleSettings.periods[i].onValue = value;
+    }
     // Clear any lingering override so the new persistent setpoint takes effect now.
     cancelOverride();
     persist();
@@ -398,7 +458,7 @@ void SpaStatus::updateStatusString() {
         control->jsonStatus["min"] = control->min;
         control->jsonStatus["max"] = control->max;
         // default override time
-        control->jsonStatus["DO"] = control->normalSettings.overrideDefaultDurationSeconds;
+        control->jsonStatus["DO"] = control->scheduleSettings.overrideDefaultDurationSeconds;
         control->jsonStatus["type"] = control->type;
         control->jsonStatus["ORT"] = control->getOverrideScheduleRemainingTime();
         control->jsonStatus["val_o"] = control->getOnState();
@@ -434,11 +494,21 @@ SpaControl *SpaStatus::findByName(const char *name) {
 void SpaStatus::setup() {
 
     // Defaults until UI configures these values (native unit is Fahrenheit):
-    pump->normalSchedule(50, 2, 1, 0);
+    // Sane new-model default: pump on Low for 5 min out of every 30, all day.
+    { SpaSchedulePeriod pp; pp.startHour = 0; pp.cycleMinutes = 30; pp.onMinutes = 5; pp.onValue = 1; pp.offValue = 0; pump->setSchedule(&pp, 1); }
     // Always on; heat to a sane default setpoint (100F), keep above freezing (40F)
     // when scheduled off. The setpoint is persistent and editable from the UI.
-    heater->normalSchedule(100, 1, 100, std::max(heater->min, (u_int8_t)40)); pump->neededBy(heater, 1, 1);
+    heater->normalSchedule(100, 1, 100, std::max(heater->min, (u_int8_t)40)); 
+    heater->scheduleSettings.overrideDefaultDurationSeconds = 3600 * 2; // different default
+
+    pump->neededBy(heater, 1, 1);
+
     ozone->lockedTo(pump, SpaControlDependencies::SPECIAL_VALUE_ANY_GREATER_THAN_ZERO, 1);
+    // Ozone follows the pump, but only during periods its own schedule marks "on".
+    // Default: armed all day (= today's behaviour) until off-periods are scheduled.
+    ozone->dependencyGatedBySchedule = true;
+    ozone->normalSchedule(100, 1, 1, 0);
+    ozone->scheduleSettings.overrideDefaultDurationSeconds = 3600; //default
 
     Serial.println("About to iterate and load settings");
     // apply saved preferences

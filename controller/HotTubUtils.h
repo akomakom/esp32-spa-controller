@@ -99,15 +99,27 @@ public:
 };
 
 
-typedef struct {
-    // default is always off:
-    u_int8_t percentageOfDayOnTime = 0;
-    u_int8_t numberOfTimesToRun = 1; // we don't allow 0 here
-    u_int8_t normalValueOn = 1;
-    u_int8_t normalValueOff = 0;
+#define MAX_SCHEDULE_PERIODS 6
+#define SCHEDULE_SETTINGS_VERSION 2
 
+// One time-of-day period. Periods tile the day: a period runs from its startHour
+// until the next period's startHour (the last runs to midnight). Within a period the
+// control cycles: ON for the first onMinutes of every cycleMinutes window. When
+// onMinutes >= cycleMinutes the control is always on (used for heater setpoints).
+typedef struct {
+    u_int8_t  startHour = 0;       // 0..23, when this period begins
+    u_int16_t onMinutes = 0;       // ON duration at the start of each cycle
+    u_int16_t cycleMinutes = 60;   // cycle length (>=1); onMinutes>=cycleMinutes => always on
+    u_int8_t  onValue = 1;         // control value while ON (pump speed, heater setpoint, ...)
+    u_int8_t  offValue = 0;        // control value while OFF
+} SpaSchedulePeriod;
+
+typedef struct {
+    u_int8_t version = SCHEDULE_SETTINGS_VERSION; // for forward migration / validation
+    u_int8_t periodCount = 1;                     // 1..MAX_SCHEDULE_PERIODS
+    SpaSchedulePeriod periods[MAX_SCHEDULE_PERIODS];
     u_int32_t overrideDefaultDurationSeconds = 60 * 20; // 20 minutes default
-} SpaSchedulerNormalSettings;
+} SpaScheduleSettings;
 
 /**
  * A Scheduler that can be attached to any control
@@ -137,6 +149,16 @@ public:
      * @param normalValueOff when in off phase, this should be the control's value
      */
     void normalSchedule(u_int8_t percentageOfDayOnTime, u_int8_t numberOfTimesToRun, u_int8_t normalValueOn, u_int8_t normalValueOff);
+
+    /**
+     * Replace the whole time-of-day schedule. Periods are sorted by startHour, the
+     * first is forced to start at 00:00, count is clamped to [1, MAX_SCHEDULE_PERIODS],
+     * and values are clamped to [min, max]. Does not persist (call persist() after).
+     */
+    void setSchedule(const SpaSchedulePeriod* newPeriods, u_int8_t count);
+
+    /** Index of the period that covers the current time of day. */
+    u_int8_t getCurrentPeriodIndex();
 
     /**
      *  Override normal schedule during this period
@@ -183,9 +205,14 @@ public:
     u_int8_t max = DEFAULT_MAX;
 
 
-    char configString[150]; // for JSON output
+    char configString[700]; // for JSON output (holds the periods array)
 
-    SpaSchedulerNormalSettings normalSettings;
+    // When true this control only follows a "locked-to" dependency (e.g. ozone->pump)
+    // while its own schedule is ON: the schedule ARMS it rather than running it directly,
+    // and it is never turned on by the schedule alone. See SpaControl::getEffectiveValue().
+    bool dependencyGatedBySchedule = false;
+
+    SpaScheduleSettings scheduleSettings;
 
 private:
     /**
@@ -200,12 +227,7 @@ private:
     time_t overrideEndTime = now();
     u_int8_t overrideValue = SCHEDULER_DISABLED_VALUE;
 
-    // For normal schedule math:
-    // These are normally set by calling normalSchedule():
-    float onOffLengthPercentage = 100; //defaults based on values of variables above (always off)
-    float onVsOff = 0; //defaults based on values of variables above (always off)
-
-    StaticJsonDocument<150> jsonConfig;
+    StaticJsonDocument<700> jsonConfig;
 };
 
 class SpaControl : public SpaControlScheduler, public SpaControlDependencies {

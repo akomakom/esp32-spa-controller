@@ -137,6 +137,25 @@
     .seg { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
     .seg button { flex: 1; background: var(--panel-2); color: var(--text); border: none; padding: 12px; font-size: 16px; cursor: pointer; }
     .seg button.sel { background: var(--accent); color: #04222f; font-weight: 700; }
+
+    /* ---- schedule editor ---- */
+    .sched-timeline { width: 100%; height: 64px; display: block; margin-bottom: 14px; }
+    .period {
+      background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px;
+      padding: 10px 12px; margin-bottom: 10px;
+    }
+    .period-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .period-when { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+    .period-remove { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; padding: 0 4px; }
+    .period-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; flex-wrap: wrap; }
+    .period-row > label { color: var(--muted); font-size: 13px; min-width: 64px; }
+    .period-row input[type=range] { flex: 1; min-width: 120px; accent-color: var(--accent); }
+    .period-derived { color: var(--accent); font-size: 13px; margin-top: 4px; }
+    .stepper { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    .stepper button { background: var(--panel); color: var(--text); border: none; width: 34px; height: 34px; font-size: 20px; cursor: pointer; }
+    .stepper button:active { background: var(--accent); color: #04222f; }
+    .stepper .val { min-width: 68px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .period .seg { max-width: 180px; }
     #durationGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
     #durationGrid button {
       background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
@@ -193,27 +212,14 @@
   <dialog id="scheduleDialog">
     <div class="dlg-head" id="scheduleTitle">Schedule</div>
     <div class="dlg-body">
+      <canvas id="schedTimeline" class="sched-timeline"></canvas>
+      <div id="schedNote" class="note" style="margin:-4px 0 12px"></div>
+      <div id="periodList"></div>
+      <button class="btn" id="addPeriodBtn" type="button">+ Add time period</button>
+      <hr style="border-color:var(--line); width:100%">
       <div class="field">
-        <label>Percentage of day this control is "ON"</label>
-        <input type="number" id="percentageOfDayOnTime" min="0" max="100">
-        <span class="hint" id="hintDaily"></span>
-      </div>
-      <div class="field">
-        <label>Number of "ON" periods per day</label>
-        <input type="number" id="numberOfTimesToRun" min="1">
-        <span class="hint" id="hintPer"></span>
-      </div>
-      <div class="field">
-        <label>Value when scheduled ON <span class="note" id="onRange"></span></label>
-        <input type="number" id="normalValueOn">
-      </div>
-      <div class="field">
-        <label>Value when scheduled OFF <span class="note" id="offRange"></span></label>
-        <input type="number" id="normalValueOff">
-      </div>
-      <div class="field">
-        <label>Default override duration (seconds)</label>
-        <input type="number" id="overrideDefaultDurationSeconds" min="0">
+        <label>Default override duration (minutes)</label>
+        <input type="number" id="overrideDefaultMinutes" min="1" step="1">
       </div>
     </div>
     <div class="dlg-foot">
@@ -377,12 +383,15 @@
     card.querySelector(".card-name").textContent = c.name;
 
     var isOn = c.val_o > 0;
-    var isDepOn = !isOn && c.val_d > 0;
+    // val_o=0 but val_d=1 means this control is off itself yet still holding a
+    // dependent on -- specifically the heater's post-heat cool-down, which keeps the
+    // pump circulating for a few minutes. It is NOT "required by another control".
+    var isCoolDown = !isOn && c.val_d > 0;
     card.classList.toggle("is-on", isOn);
 
     var dot = card.querySelector(".dot");
-    dot.className = "dot" + (isOn ? " on" : isDepOn ? " dep" : "");
-    dot.title = isOn ? "ON" : isDepOn ? "ON (required by another control)" : "OFF";
+    dot.className = "dot" + (isOn ? " on" : isCoolDown ? " dep" : "");
+    dot.title = isOn ? "ON" : isCoolDown ? "Off — keeping the pump running to cool down" : "OFF";
 
     card.querySelector(".dep-flag").style.display = c.depctl ? "" : "none";
 
@@ -397,7 +406,15 @@
 
     if (c.type === "sensor-based") {
       var live = pendingSetpoint[c.name];
-      var shown = live != null ? live : c.value;   // native °C
+      // Clear the optimistic value only once the controller's status catches up to it.
+      // Its command queue can lag a status read, which would otherwise snap the number
+      // back to a stale value while you are still adjusting it.
+      if (live != null && Number(c.value) === Number(live)) {
+        delete pendingSetpoint[c.name];
+        clearTimeout(pendingSetpoint["_c_" + c.name]);
+        live = null;
+      }
+      var shown = live != null ? live : c.value;   // native °F
       card.querySelector(".setpoint").innerHTML =
         Math.round(toDisplayTemp(shown)) + unitLabel() +
         "<small>setpoint</small>";
@@ -419,15 +436,25 @@
   function stepSetpoint(name, delta) {
     var c = statusByName[name];
     if (!c) return;
-    var cur = pendingSetpoint[name] != null ? pendingSetpoint[name] : c.value; // native °C
-    var next = Math.max(c.min, Math.min(c.max, cur + delta));
+    var base = pendingSetpoint[name] != null ? pendingSetpoint[name] : c.value; // native °F
+    if (base == null || isNaN(base)) base = c.min;
+    var next = Math.max(c.min, Math.min(c.max, base + delta));
     pendingSetpoint[name] = next;
     renderCard(c); // optimistic
     clearTimeout(pendingSetpoint["_t_" + name]);
     pendingSetpoint["_t_" + name] = setTimeout(function () {
+      var target = pendingSetpoint[name];          // capture: never post an undefined value
+      if (target == null) return;
       var duration = c.ORT > 0 ? c.ORT : (c.DO || 0);
-      post("/override", { control: name, start: 0, duration: duration, value: pendingSetpoint[name] })
-        .then(function () { delete pendingSetpoint[name]; refresh(); })
+      post("/override", { control: name, start: 0, duration: duration, value: target })
+        .then(function () {
+          // Do NOT clear the optimistic value here; let a poll confirm it once the
+          // controller applies the queued command (renderCard clears it on match).
+          // Safety net: drop it after a few polls so a lost command can't stick.
+          clearTimeout(pendingSetpoint["_c_" + name]);
+          pendingSetpoint["_c_" + name] = setTimeout(function () { delete pendingSetpoint[name]; refresh(); }, 12000);
+          refresh();
+        })
         .catch(function () { delete pendingSetpoint[name]; flashError(name); });
     }, 600);
   }
@@ -462,64 +489,246 @@
       .catch(function () { flashError(durationTarget); });
   }
 
-  // ---- schedule dialog ----
+  // ---- schedule dialog (time-of-day periods) ----
   var scheduleTarget = null;
-  function rangeText(c) {
-    if (isTempControl(c)) {
-      return "(" + Math.round(toDisplayTemp(c.min)) + "–" + Math.round(toDisplayTemp(c.max)) + unitLabel() + ")";
-    }
-    return "(" + c.min + "–" + c.max + ")";
+  var schedPeriods = [];        // working copy while editing
+  var schedMaxPeriods = 6;
+  var schedControl = {};        // status entry for the control being edited
+  var schedGated = false;       // control follows a dependency only while "armed" (ozone)
+  var CYCLE_LADDER = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 360, 480, 720, 1440];
+
+  function periodEndHour(i) { return (i + 1 < schedPeriods.length) ? schedPeriods[i + 1].startHour : 24; }
+  function endLabel(i) { var h = periodEndHour(i); return h === 24 ? "midnight" : fmtHour(h); }
+  function fmtHour(h) {
+    var ampm = h < 12 ? "AM" : "PM", hh = h % 12; if (hh === 0) hh = 12;
+    return hh + ":00 " + ampm;
   }
+  function fmtDuration(min) {
+    if (min < 60) return min + " min";
+    var h = Math.floor(min / 60), m = min % 60;
+    return m === 0 ? (h + "h") : (h + "h " + m + "m");
+  }
+  function nearestLadder(v) {
+    var best = CYCLE_LADDER[0], bd = Infinity;
+    CYCLE_LADDER.forEach(function (c) { var d = Math.abs(c - v); if (d < bd) { bd = d; best = c; } });
+    return best;
+  }
+  function ladderStep(v, dir) {
+    var idx = CYCLE_LADDER.indexOf(v); if (idx < 0) idx = CYCLE_LADDER.indexOf(nearestLadder(v));
+    idx = Math.max(0, Math.min(CYCLE_LADDER.length - 1, idx + dir));
+    return CYCLE_LADDER[idx];
+  }
+  // Explicit per-period mode so the on-time slider never silently flips the mode.
+  function setMode(p, mode) {
+    p._mode = mode;
+    if (mode === "off") { /* onMinutes unused */ }
+    else if (mode === "always") { p.onMinutes = p.cycleMinutes; }
+    else { // cycle
+      if (p.cycleMinutes < 5) p.cycleMinutes = nearestLadder(p.cycleMinutes);
+      if (!(p.onMinutes > 0 && p.onMinutes < p.cycleMinutes)) p.onMinutes = Math.max(1, Math.min(5, p.cycleMinutes - 1));
+    }
+  }
+  function saveOnMinutes(p) { return p._mode === "off" ? 0 : (p._mode === "always" ? p.cycleMinutes : p.onMinutes); }
+
+  // --- live timeline canvas ---
+  function cssVar(n, fb) { return (getComputedStyle(document.documentElement).getPropertyValue(n).trim() || fb); }
+  function onColorFor(p) {
+    if (schedControl.type === "sensor-based") return cssVar('--on', '#ff4d4d');
+    if (schedControl.type === "off-low-high") return p.onValue >= 2 ? cssVar('--high', '#ff7043') : cssVar('--low', '#ffb020');
+    return cssVar('--ok', '#3ddc84');
+  }
+  function drawTimeline() {
+    var cv = document.getElementById("schedTimeline");
+    var dpr = window.devicePixelRatio || 1, w = cv.clientWidth || 300, h = 64;
+    cv.width = w * dpr; cv.height = h * dpr;
+    var ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+    var barTop = 4, barH = 40, ppm = w / 1440;
+    ctx.fillStyle = "#0e1a24"; ctx.fillRect(0, barTop, w, barH);
+    for (var i = 0; i < schedPeriods.length; i++) {
+      var p = schedPeriods[i], s = p.startHour * 60, e = periodEndHour(i) * 60, col = onColorFor(p);
+      ctx.fillStyle = col;
+      var alwaysFill = (schedControl.type === "sensor-based") || (p._mode === "always");
+      var effOn = (schedControl.type === "sensor-based") ? p.cycleMinutes : saveOnMinutes(p);
+      if (alwaysFill) {
+        ctx.fillRect(s * ppm, barTop, (e - s) * ppm, barH);
+      } else if (effOn > 0) {
+        for (var t = s; t < e; t += p.cycleMinutes) {
+          var oe = Math.min(t + effOn, e);
+          ctx.fillRect(t * ppm, barTop, (oe - t) * ppm, barH);
+        }
+      }
+      if (i > 0) {
+        ctx.strokeStyle = cssVar('--text', '#e8f1f8'); ctx.globalAlpha = .5;
+        ctx.beginPath(); ctx.moveTo(s * ppm, barTop); ctx.lineTo(s * ppm, barTop + barH); ctx.stroke(); ctx.globalAlpha = 1;
+      }
+    }
+    ctx.fillStyle = cssVar('--muted', '#8fa6b6'); ctx.font = "10px system-ui, sans-serif"; ctx.textAlign = "center";
+    for (var hh = 0; hh <= 24; hh += 3) {
+      var x = hh * 60 * ppm;
+      ctx.strokeStyle = cssVar('--line', '#2b3f50'); ctx.beginPath(); ctx.moveTo(x, barTop + barH); ctx.lineTo(x, barTop + barH + 4); ctx.stroke();
+      ctx.fillText(hh + "h", Math.min(Math.max(x, 8), w - 8), h - 2);
+    }
+    var now = new Date(), nm = now.getHours() * 60 + now.getMinutes();
+    ctx.strokeStyle = cssVar('--accent', '#33bdef'); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(nm * ppm, barTop - 2); ctx.lineTo(nm * ppm, barTop + barH + 2); ctx.stroke(); ctx.lineWidth = 1;
+  }
+
+  function derivedText(p) {
+    if (schedControl.type === "sensor-based") return "Hold " + Math.round(toDisplayTemp(p.onValue)) + unitLabel() + " all period";
+    var spd = schedControl.type === "off-low-high" ? (p.onValue >= 2 ? " on High" : " on Low") : "";
+    if (p._mode === "off") return schedGated ? "Off — won't run this period" : "Off this period";
+    if (p._mode === "always") return schedGated ? "Armed whenever the pump runs" : ("On the whole period" + spd);
+    if (schedGated) return "Armed " + fmtDuration(p.onMinutes) + " of every " + fmtDuration(p.cycleMinutes) + " (only while the pump runs)";
+    return fmtDuration(p.onMinutes) + " on / " + fmtDuration(p.cycleMinutes - p.onMinutes) + " off" + spd;
+  }
+  function stepper(valText, onMinus, onPlus) {
+    var w = document.createElement("div"); w.className = "stepper";
+    var a = document.createElement("button"); a.type = "button"; a.textContent = "−";
+    var v = document.createElement("span"); v.className = "val"; v.textContent = valText;
+    var b = document.createElement("button"); b.type = "button"; b.textContent = "+";
+    a.addEventListener("click", onMinus); b.addEventListener("click", onPlus);
+    w.appendChild(a); w.appendChild(v); w.appendChild(b); return w;
+  }
+  function periodRow(labelText, node) {
+    var r = document.createElement("div"); r.className = "period-row";
+    var l = document.createElement("label"); l.textContent = labelText; r.appendChild(l); r.appendChild(node); return r;
+  }
+  function renderPeriods() {
+    var list = document.getElementById("periodList"); list.innerHTML = "";
+    schedPeriods.forEach(function (p, i) {
+      var box = document.createElement("div"); box.className = "period";
+      var top = document.createElement("div"); top.className = "period-top";
+      var when = document.createElement("div"); when.className = "period-when";
+      when.appendChild(document.createTextNode("From "));
+      if (i === 0) {
+        when.appendChild(document.createTextNode("12:00 AM"));
+      } else {
+        var lo = schedPeriods[i - 1].startHour + 1;
+        var hi = (i + 1 < schedPeriods.length ? schedPeriods[i + 1].startHour - 1 : 23);
+        when.appendChild(stepper(fmtHour(p.startHour),
+          function () { if (p.startHour > lo) { p.startHour--; renderPeriods(); drawTimeline(); } },
+          function () { if (p.startHour < hi) { p.startHour++; renderPeriods(); drawTimeline(); } }));
+      }
+      var toSpan = document.createElement("span"); toSpan.style.color = "var(--muted)"; toSpan.style.fontWeight = "400";
+      toSpan.textContent = " → " + endLabel(i);
+      when.appendChild(toSpan);
+      top.appendChild(when);
+      if (i > 0) {
+        var rm = document.createElement("button"); rm.className = "period-remove"; rm.type = "button"; rm.innerHTML = "&times;"; rm.title = "Remove period";
+        rm.addEventListener("click", function () { schedPeriods.splice(i, 1); renderPeriods(); drawTimeline(); });
+        top.appendChild(rm);
+      }
+      box.appendChild(top);
+
+      if (schedControl.type === "sensor-based") {
+        box.appendChild(periodRow("Heat to", stepper(Math.round(toDisplayTemp(p.onValue)) + unitLabel(),
+          function () { p.onValue = Math.max(schedControl.min, p.onValue - 1); renderPeriods(); drawTimeline(); },
+          function () { p.onValue = Math.min(schedControl.max, p.onValue + 1); renderPeriods(); drawTimeline(); })));
+      } else {
+        // explicit mode selector so the on-time slider can't silently flip modes
+        var modeSeg = document.createElement("div"); modeSeg.className = "seg";
+        var alwaysLabel = schedGated ? "Always armed" : "Always on";
+        [["Off", "off"], ["Cycle", "cycle"], [alwaysLabel, "always"]].forEach(function (pair) {
+          var b = document.createElement("button"); b.type = "button"; b.textContent = pair[0];
+          if ((p._mode || "cycle") === pair[1]) b.classList.add("sel");
+          b.addEventListener("click", function () { setMode(p, pair[1]); renderPeriods(); drawTimeline(); });
+          modeSeg.appendChild(b);
+        });
+        box.appendChild(periodRow(schedGated ? "Ozone" : "Mode", modeSeg));
+
+        if (schedControl.type === "off-low-high" && p._mode !== "off") {
+          var seg = document.createElement("div"); seg.className = "seg";
+          [["Low", 1], ["High", 2]].forEach(function (pair) {
+            var b = document.createElement("button"); b.type = "button"; b.textContent = pair[0];
+            if (p.onValue === pair[1]) b.classList.add("sel");
+            b.addEventListener("click", function () { p.onValue = pair[1]; renderPeriods(); drawTimeline(); });
+            seg.appendChild(b);
+          });
+          box.appendChild(periodRow("Speed", seg));
+        }
+        if (p._mode === "cycle") {
+          box.appendChild(periodRow("Run every", stepper(fmtDuration(p.cycleMinutes),
+            function () { p.cycleMinutes = ladderStep(p.cycleMinutes, -1); if (p.onMinutes >= p.cycleMinutes) p.onMinutes = Math.max(1, p.cycleMinutes - 1); renderPeriods(); drawTimeline(); },
+            function () { p.cycleMinutes = ladderStep(p.cycleMinutes, 1); renderPeriods(); drawTimeline(); })));
+          var rng = document.createElement("input");
+          rng.type = "range"; rng.min = 1; rng.max = p.cycleMinutes; rng.step = 1; rng.value = Math.min(p.onMinutes, p.cycleMinutes);
+          rng.addEventListener("input", function () { p.onMinutes = parseInt(rng.value, 10); document.getElementById("der" + i).textContent = derivedText(p); drawTimeline(); });
+          box.appendChild(periodRow(schedGated ? "Armed for" : "On for", rng));
+        }
+      }
+      var der = document.createElement("div"); der.className = "period-derived"; der.id = "der" + i; der.textContent = derivedText(p);
+      box.appendChild(der);
+      list.appendChild(box);
+    });
+    document.getElementById("addPeriodBtn").style.display = schedPeriods.length < schedMaxPeriods ? "" : "none";
+  }
+
   function openSchedule(name) {
     scheduleTarget = name;
-    var c = statusByName[name] || {};
-    var isTemp = isTempControl(c);
+    schedControl = statusByName[name] || {};
     document.getElementById("scheduleTitle").textContent = "Schedule: " + name;
-    document.getElementById("onRange").textContent = rangeText(c);
-    document.getElementById("offRange").textContent = rangeText(c);
     fetch("/configureControl?control=" + encodeURIComponent(name))
       .then(function (r) { return r.json(); })
       .then(function (cfg) {
-        ["percentageOfDayOnTime","numberOfTimesToRun","overrideDefaultDurationSeconds"]
-          .forEach(function (k) { document.getElementById(k).value = cfg[k]; });
-        // Temperatures are stored natively in Celsius; show them in the display unit.
-        document.getElementById("normalValueOn").value  = isTemp ? Math.round(toDisplayTemp(cfg.normalValueOn))  : cfg.normalValueOn;
-        document.getElementById("normalValueOff").value = isTemp ? Math.round(toDisplayTemp(cfg.normalValueOff)) : cfg.normalValueOff;
-        updateScheduleHints();
+        schedMaxPeriods = cfg.maxPeriods || 6;
+        schedGated = !!cfg.gated;
+        schedPeriods = (cfg.periods || []).map(function (p) {
+          var q = { startHour: p.startHour | 0, onMinutes: p.onMinutes | 0, cycleMinutes: p.cycleMinutes || 60, onValue: p.onValue | 0, offValue: p.offValue | 0 };
+          if (schedControl.type !== "sensor-based") {
+            // Derive the explicit mode from the stored values, then snap the cycle onto
+            // the ladder so the stepper never shows an unreachable value (e.g. 1440).
+            var rawAlways = q.onMinutes >= q.cycleMinutes, rawOff = q.onMinutes <= 0;
+            q.cycleMinutes = nearestLadder(q.cycleMinutes);
+            q._mode = rawOff ? "off" : (rawAlways ? "always" : "cycle");
+            if (q._mode === "always") q.onMinutes = q.cycleMinutes;
+            else if (q._mode === "off") q.onMinutes = 0;
+            else q.onMinutes = Math.max(1, Math.min(q.onMinutes, q.cycleMinutes - 1));
+          }
+          return q;
+        });
+        if (!schedPeriods.length) schedPeriods = [{ startHour: 0, onMinutes: 0, cycleMinutes: 30, onValue: 1, offValue: 0, _mode: "off" }];
+        schedPeriods[0].startHour = 0;
+        document.getElementById("overrideDefaultMinutes").value = Math.round((cfg.overrideDefaultDurationSeconds || 1200) / 60);
+        var noteEl = document.getElementById("schedNote");
+        if (schedGated) {
+          noteEl.textContent = name + " only runs while the pump runs; this schedule just chooses when it's allowed to (armed).";
+        } else if (schedControl.depctl) {
+          noteEl.textContent = "Heads up: this also runs automatically whenever the " + schedControl.depctl + " needs circulation (e.g. while heating), regardless of the schedule below.";
+        } else {
+          noteEl.textContent = "";
+        }
+        renderPeriods();
         document.getElementById("scheduleDialog").showModal();
+        requestAnimationFrame(drawTimeline);
       })
       .catch(function () { toast("Could not load schedule"); });
   }
-  function updateScheduleHints() {
-    var pct = parseFloat(document.getElementById("percentageOfDayOnTime").value) || 0;
-    var n = parseFloat(document.getElementById("numberOfTimesToRun").value) || 1;
-    var dailySec = pct * 24 * 3600 / 100;
-    document.getElementById("hintDaily").textContent = "≈ " + humanize(dailySec) + " per day";
-    document.getElementById("hintPer").textContent = "≈ " + humanize(dailySec / n) + " on, per period";
-  }
-  document.getElementById("percentageOfDayOnTime").addEventListener("input", updateScheduleHints);
-  document.getElementById("numberOfTimesToRun").addEventListener("input", updateScheduleHints);
-  document.getElementById("scheduleSave").addEventListener("click", function () {
-    var c = statusByName[scheduleTarget] || {};
-    var isTemp = isTempControl(c);
-    var data = { control: scheduleTarget };
-    var ok = true;
-    ["percentageOfDayOnTime","numberOfTimesToRun","overrideDefaultDurationSeconds"]
-      .forEach(function (k) { data[k] = document.getElementById(k).value; });
-    // Temperature fields are entered in the display unit; validate there, then
-    // convert back to native Celsius (the controller's storage unit).
-    ["normalValueOn","normalValueOff"].forEach(function (k) {
-      var el = document.getElementById(k);
-      var nativeVal = isTemp ? Math.round(fromDisplayTemp(Number(el.value))) : Number(el.value);
-      if (nativeVal < c.min || nativeVal > c.max) { el.classList.add("invalid"); ok = false; }
-      else { el.classList.remove("invalid"); }
-      data[k] = nativeVal;
-    });
-    if (!ok) { toast("Value out of range " + rangeText(c)); return; }
-    post("/configureControl", data)
-      .then(function () { document.getElementById("scheduleDialog").close(); refresh(); })
-      .catch(function (e) { toast("Save failed"); });
+  document.getElementById("addPeriodBtn").addEventListener("click", function () {
+    if (schedPeriods.length >= schedMaxPeriods) return;
+    var last = schedPeriods[schedPeriods.length - 1];
+    var newStart = Math.min(23, last.startHour + Math.max(1, Math.floor((24 - last.startHour) / 2)));
+    var np = (schedControl.type === "sensor-based")
+      ? { startHour: newStart, onMinutes: 60, cycleMinutes: 60, onValue: last.onValue, offValue: last.offValue }
+      : { startHour: newStart, onMinutes: 5, cycleMinutes: 15, onValue: last.onValue || 1, offValue: 0, _mode: "cycle" };
+    schedPeriods.push(np); renderPeriods(); drawTimeline();
   });
+  document.getElementById("scheduleSave").addEventListener("click", function () {
+    schedPeriods.sort(function (a, b) { return a.startHour - b.startHour; });
+    schedPeriods[0].startHour = 0;
+    var periods = schedPeriods.map(function (p) {
+      var onMin = (schedControl.type === "sensor-based") ? p.cycleMinutes : saveOnMinutes(p);
+      return { startHour: p.startHour, onMinutes: onMin, cycleMinutes: p.cycleMinutes, onValue: p.onValue, offValue: p.offValue };
+    });
+    var data = {
+      control: scheduleTarget,
+      periods: JSON.stringify(periods),
+      overrideDefaultDurationSeconds: Math.max(1, parseInt(document.getElementById("overrideDefaultMinutes").value, 10) || 20) * 60
+    };
+    post("/configureControl", data)
+      .then(function () { document.getElementById("scheduleDialog").close(); refresh(); toast("Schedule saved"); })
+      .catch(function () { toast("Save failed"); });
+  });
+  window.addEventListener("resize", function () { var d = document.getElementById("scheduleDialog"); if (d && d.open) drawTimeline(); });
 
   // ---- settings dialog ----
   document.getElementById("settingsBtn").addEventListener("click", function () {
