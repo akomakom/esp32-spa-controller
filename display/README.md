@@ -62,5 +62,5 @@ pio device monitor       # serial console
 pio run -t upload --upload-port /dev/ttyUSB1   # override the port from platformio.ini
 ```
 
-The legacy `arduino-cli` `Makefile` is still present and works, but PlatformIO is the maintained
-path (it pins the versions above and needs no global `~/Arduino/libraries` setup).
+The `Makefile` in this directory is a thin convenience wrapper around these `pio` commands
+(`make upload`, `make monitor`).

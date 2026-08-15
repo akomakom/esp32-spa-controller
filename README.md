@@ -45,8 +45,9 @@ declared in each project's `platformio.ini` and fetched from the PlatformIO regi
 time — nothing large is vendored in git. The one exception is `XPT2046_Touchscreen`, kept under
 `display/lib/` because it carries a small local patch (see below).
 
-The original `arduino-cli` Makefiles are still present and work, but PlatformIO is the
-maintained path; it pins library versions and removes the old shared-header symlink hack.
+Each project has a `Makefile` too, but it is only a thin convenience wrapper around `pio`
+(`make upload`, `make monitor`, and — on the controller — a few HTTP helpers for OTA and live
+SPIFFS sync). There is no separate arduino-cli build path anymore.
 
 ### Installation on a new ESP32
 
@@ -63,8 +64,8 @@ pio device monitor     # serial console
 
 The web UI is a single self-contained `data/index.html` (no CDN/jQuery), so it works offline on
 the controller's own AP. Firmware/filesystem/WiFi endpoints are behind HTTP Basic auth. See
-[controller/README.md](controller%2FREADME.md) for details, credentials, and the legacy `make`
-targets.
+[controller/README.md](controller%2FREADME.md) for details, credentials, and the `make`
+convenience targets.
 
 #### Display (optional touchscreen remote)
 

@@ -8,9 +8,5 @@ idf_component.yml
 # Display serial logs (local scratch)
 display/log
 display/log2
-/controller/hot_tub_types.h
-/controller/secrets.h
-/display/hot_tub_types.h
-/display/secrets.h
 time_examples.cpp
 libs

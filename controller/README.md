@@ -17,15 +17,16 @@ With PlatformIO these are fetched automatically from the registry (see `lib_deps
 
 #### Binary
 
-Two supported build paths:
+Build and flash with PlatformIO (pins library versions, needs no header symlinks):
 
-* **PlatformIO** (recommended, pins library versions and needs no header symlinks):
-  ```shell
-  cd controller
-  pio run -t upload      # build + flash
-  pio device monitor     # serial console
-  ```
-* **arduino-cli** (original/legacy): `make upload monitor`
+```shell
+cd controller
+pio run -t upload      # build + flash
+pio device monitor     # serial console
+```
+
+The `Makefile` in this directory wraps the same commands for convenience
+(`make upload`, `make monitor`, `make uploadfs`) — see the HTTP helpers below.
 
 Note: the controller board (`esp32dev`, `/dev/ttyUSB0` by default) does not auto-enter the
 bootloader on some USB-serial adapters — hold BOOT / tap EN before `pio run -t upload` if the
@@ -38,12 +39,8 @@ so it works fully offline on the device's own AP. It reads the C/F unit from the
 controller, so the toggle in the on-screen Settings dialog changes both the web and
 the touchscreen display.
 
-One-time step: Use Arduino IDE to upload SPIFFS to initialize the partition:
-`Tools->ESP32 Sketch Data Upload`  (You'll need the ESP32 additional boards installed)
-
-If you do not see that menu item, install https://github.com/me-no-dev/arduino-esp32fs-plugin
-
-With PlatformIO: `pio run -t uploadfs` uploads the `data/` directory.
+Upload it (and initialize the SPIFFS partition) with `pio run -t uploadfs`, or
+`make uploadfs`, which flashes the `data/` directory to the device.
 
 #### Security
 

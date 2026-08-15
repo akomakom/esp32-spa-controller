@@ -1,52 +1,68 @@
-# This Makefile contains macros for using command-line, eg
-# arduino-cli instead of arduino IDE
+# Convenience wrapper around PlatformIO (pio) for the CONTROLLER board.
+#
+# The real build configuration lives in platformio.ini. These targets are just
+# shortcuts for common pio invocations plus a few HTTP-based helpers that pio
+# does not provide (OTA firmware push, live SPIFFS sync of the web UI).
+#
+# Shared headers (hot_tub_types.h, secrets.h) are pulled from the repo root via
+# `build_flags = -I..` in platformio.ini, so there is no symlink step anymore.
 
-ARDUINO_CLI ?= /opt/arduino-cli/arduino-cli
-BAUD ?= 115200
+PIO ?= pio
+ENV ?= controller
 PORT ?= /dev/ttyUSB0
-FQBN ?= esp32:esp32:esp32
-FQBN_PATH = $(shell echo ${FQBN} | tr : .)
-INO = $(shell echo *.ino | head -n 1)
-#MKSPIFFS ?= /opt/arduino-cli/mkspiffs
-#SPIFFS_OUTPUT_FILE=build/spiffs.bin
+FIRMWARE = .pio/build/$(ENV)/firmware.bin
 
-# Because arduino can't handle a relative path parent directory include, we symlink these:
-# On windows you may need to copy the files to each project instead
-secrets.h:
-	ln -s ../secrets.h .
+# HTTP Basic auth for the /update and /edit endpoints, parsed from the shared
+# secrets.h (same #defines the firmware uses). Falls back to admin/admin, which
+# is what the firmware defaults to when the #defines are absent. Override on the
+# command line if needed, e.g. `make upload-via-http OTA_AUTH_USER=foo ...`.
+SECRETS ?= ../secrets.h
+parse-secret = $(shell sed -n 's/^[[:space:]]*\#define[[:space:]]\+$(1)[[:space:]]\+"\(.*\)".*/\1/p' $(SECRETS) 2>/dev/null)
+OTA_AUTH_USER := $(or $(call parse-secret,OTA_AUTH_USER),admin)
+OTA_AUTH_PASS := $(or $(call parse-secret,OTA_AUTH_PASS),admin)
+CURL := curl -u '$(OTA_AUTH_USER):$(OTA_AUTH_PASS)'
+# Compile the firmware
+compile:
+	$(PIO) run -e $(ENV)
 
-hot_tub_types.h:
-	ln -s ../hot_tub_types.h .
+# Flash the firmware over USB
+upload:
+	$(PIO) run -e $(ENV) -t upload --upload-port $(PORT)
 
-compile: secrets.h hot_tub_types.h
-	${ARDUINO_CLI} compile --fqbn ${FQBN} -e .
-
-# TBD
-#spiffs:
-#	${MKSPIFFS} -c data ${SPIFFS_OUTPUT_FILE}
-
-
-# Upload the firmware
-upload: compile
-	 ${ARDUINO_CLI} upload -p ${PORT} --fqbn ${FQBN} --discovery-timeout 30s . -v
-
-# POST binary firmware to /upload endpoint instead of via USB
-upload-via-http: compile guard-TARGET_IP
-	curl -v --progress-bar -F update=@build/${FQBN_PATH}/${INO}.bin http://${TARGET_IP}/update
+# Build + upload the data/ web UI to SPIFFS
+uploadfs:
+	$(PIO) run -e $(ENV) -t uploadfs --upload-port $(PORT)
 
 # Serial console of the board
 monitor:
-	while [ 1 ] ; do ${ARDUINO_CLI} monitor -p ${PORT} --fqbn ${FQBN} --discovery-timeout 30s -c baudrate=${BAUD} . ; done
+	$(PIO) device monitor --port $(PORT)
 
-# Once firmware is uploaded, it is possible to use this to sync contents of data/ to the ESP
-# without using mkspiffs or arduino IDE's spiffs plugin (this does not handle delete)
-# Note that initial upload must be done first (eg via Arduino IDE or mkspiffs)
+# POST binary firmware to the /update endpoint instead of flashing via USB.
+# Fails the target unless the endpoint returns HTTP 200.
+upload-via-http: compile guard-TARGET_IP
+	@echo "Uploading $(FIRMWARE) to http://${TARGET_IP}/update as $(OTA_AUTH_USER)" ; \
+	code=$$($(CURL) --progress-bar -o /dev/null -w '%{http_code}' \
+		-u "$(OTA_AUTH_USER):$(OTA_AUTH_PASS)" \
+		-F update=@$(FIRMWARE) http://${TARGET_IP}/update) ; \
+	echo "HTTP $$code" ; \
+	if [ "$$code" != "200" ]; then echo "Firmware upload failed (HTTP $$code)" >&2 ; exit 1 ; fi
+
+# Once firmware is uploaded, sync the contents of data/ to the ESP over HTTP
+# without a full SPIFFS reflash (this does not handle deletes).
+# Note that an initial SPIFFS upload must be done first (make uploadfs).
 upload-spiffs-via-http: guard-TARGET_IP
-	for file in data/*.* ; do echo Uploading $$file ; curl -X POST -F "data=@$$file"  http://${TARGET_IP}/edit ; done
+	for file in data/*.* ; do \
+		echo -n "Uploading $$file ... " ; \
+		$(CURL) -w '%{http_code}' -X POST -F "data=@$$file"  http://${TARGET_IP}/edit ; \
+		echo "" ; \
+	done
 
 upload-spiffs-via-http-inotifywait: guard-TARGET_IP
-	#cd data && inotifywait -m . -e close_write -r -m | grep -v '~' | while read dir action file; do echo $$file ; curl -X POST -F "data=@$$file"  http://${TARGET_IP}/edit ; done
-	cd data && inotifywait -m . -e close_write --exclude '.*~' | while read DIR ACTION FILE ; do echo Uploading $$FILE ; curl -X POST -F "data=@$$FILE"  http://${TARGET_IP}/edit ; done
+	cd data && inotifywait -m . -e close_write --exclude '.*~' | while read DIR ACTION FILE ; do \
+		echo -n "Uploading $$FILE ... " ; \
+		$(CURL) -w '%{http_code}' -X POST -F "data=@$$FILE" http://${TARGET_IP}/edit ; \
+		echo "" ; \
+	done
 
 # Check that the named variable is set
 guard-%:
@@ -54,3 +70,5 @@ guard-%:
 		echo "Environment variable $* not set"; \
 		exit 1; \
 	fi
+
+.PHONY: compile upload uploadfs monitor upload-via-http upload-spiffs-via-http upload-spiffs-via-http-inotifywait
