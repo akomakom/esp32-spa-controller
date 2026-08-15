@@ -67,6 +67,37 @@ TAMC_GT911 ts = TAMC_GT911(TOUCH_GT911_SDA, TOUCH_GT911_SCL, TOUCH_GT911_INT, TO
 #include <SPI.h>
 XPT2046_Touchscreen ts(TOUCH_XPT2046_CS, TOUCH_XPT2046_INT);
 
+// --- Rolling-median filter -----------------------------------------------------
+// This resistive panel occasionally returns a wildly off raw reading (a single
+// sample can jump 30%+, e.g. raw X 1304 among neighbours around 850), which then
+// maps onto the wrong control. Each physical touch yields several samples, so keep
+// a short window of raw readings and report their per-axis MEDIAN, which discards
+// the odd outlier (a mean would still be dragged toward it). A gap since the last
+// sample starts a fresh window (= a new, separate touch). We withhold the press
+// until a few samples are in, so the very first (possibly bad) sample can't land
+// the press on the wrong control.
+#define TOUCH_MEDIAN_WINDOW     7    // raw samples retained
+#define TOUCH_MEDIAN_MIN        3    // samples for the normal path (median rejects 1 outlier)
+#define TOUCH_MEDIAN_FLOOR      2    // fewest samples the time fallback will accept
+#define TOUCH_SETTLE_MS         45   // commit a short touch by now even with < MIN samples
+#define TOUCH_NEW_TOUCH_GAP_MS  120  // gap that marks the start of a new touch
+static int touchRawX[TOUCH_MEDIAN_WINDOW];
+static int touchRawY[TOUCH_MEDIAN_WINDOW];
+static uint8_t touchSampleCount = 0;
+static uint8_t touchSampleHead = 0;
+static unsigned long touchLastSampleMs = 0;
+static unsigned long touchStartMs = 0;   // time of the first sample of the current touch
+
+static int touch_median(const int *src, uint8_t n) {
+    int tmp[TOUCH_MEDIAN_WINDOW];
+    for (uint8_t i = 0; i < n; i++) tmp[i] = src[i];
+    for (uint8_t i = 1; i < n; i++) { // insertion sort; n is tiny (<= window)
+        int v = tmp[i], j = i;
+        while (j > 0 && tmp[j - 1] > v) { tmp[j] = tmp[j - 1]; j--; }
+        tmp[j] = v;
+    }
+    return tmp[n / 2];
+}
 #endif
 
 #if defined(TOUCH_FT6X36)
@@ -184,13 +215,39 @@ bool touch_touched()
   if (ts.touched())
   {
     TS_Point p = ts.getPoint();
-    Serial.printf("Touch Raw remap from %d/%d @%d", p.x, p.y, p.z);
+
+    unsigned long nowMs = millis();
+    if (nowMs - touchLastSampleMs > TOUCH_NEW_TOUCH_GAP_MS) {
+      // Long gap since the last sample -> this is a new touch; drop the old window.
+      touchSampleCount = 0;
+      touchSampleHead = 0;
+      touchStartMs = nowMs;
+    }
+    touchLastSampleMs = nowMs;
+
+    touchRawX[touchSampleHead] = p.x;
+    touchRawY[touchSampleHead] = p.y;
+    touchSampleHead = (touchSampleHead + 1) % TOUCH_MEDIAN_WINDOW;
+    if (touchSampleCount < TOUCH_MEDIAN_WINDOW) touchSampleCount++;
+
+    // Commit the press once we have enough samples for a solid median, OR after a
+    // short settle time with at least a couple of samples (so a brief tap that only
+    // produces 2 reads still registers instead of being silently dropped).
+    bool ready = (touchSampleCount >= TOUCH_MEDIAN_MIN) ||
+                 (touchSampleCount >= TOUCH_MEDIAN_FLOOR && (nowMs - touchStartMs) >= TOUCH_SETTLE_MS);
+    if (!ready) {
+      return false;
+    }
+
+    int mx = touch_median(touchRawX, touchSampleCount);
+    int my = touch_median(touchRawY, touchSampleCount);
+    Serial.printf("Touch raw %d/%d @%d -> median %d/%d (n=%d)", p.x, p.y, p.z, mx, my, touchSampleCount);
 #if defined(TOUCH_SWAP_XY)
-    touch_last_x = map(p.y, TOUCH_MAP_X1, TOUCH_MAP_X2, 0, gfx->width() - 1);
-    touch_last_y = map(p.x, TOUCH_MAP_Y1, TOUCH_MAP_Y2, 0, gfx->height() - 1);
+    touch_last_x = map(my, TOUCH_MAP_X1, TOUCH_MAP_X2, 0, gfx->width() - 1);
+    touch_last_y = map(mx, TOUCH_MAP_Y1, TOUCH_MAP_Y2, 0, gfx->height() - 1);
 #else
-    touch_last_x = map(p.x, TOUCH_MAP_X1, TOUCH_MAP_X2, 0, gfx->width() - 1);
-    touch_last_y = map(p.y, TOUCH_MAP_Y1, TOUCH_MAP_Y2, 0, gfx->height() - 1);
+    touch_last_x = map(mx, TOUCH_MAP_X1, TOUCH_MAP_X2, 0, gfx->width() - 1);
+    touch_last_y = map(my, TOUCH_MAP_Y1, TOUCH_MAP_Y2, 0, gfx->height() - 1);
 #endif
     return true;
   }
