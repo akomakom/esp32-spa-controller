@@ -375,6 +375,13 @@ SensorBasedControl::SensorBasedControl(const char *name, u_int8_t pin, u_int8_t 
  */
 u_int8_t SensorBasedControl::getOnState() {
     if (spaWinterized) return 0; // forced off, ignoring the setpoint/schedule
+    // Safety lockout: if the sensor reading is stale/invalid we cannot know the
+    // water temperature, so never heat. Otherwise getTempF() would return 0 and
+    // the delta below would look "very cold", latching the heater ON indefinitely.
+    if (!temperatureUtils->isValid(sensorIndex)) {
+        slowFlipState = false;
+        return 0;
+    }
     // Don't just flip/flop any time temperature is below threshold.
     // Instead:
     //  if currently off and we are colder than (threshold - swing), turn on

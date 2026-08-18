@@ -34,8 +34,11 @@ void TemperatureUtils::readTemperatures() {
         if (temp < MINIMUM_VALID_TEMP_F || temp > MAXIMUM_VALID_TEMP_F) {
             Serial.print("Invalid temperature reading (F): ");
             Serial.println(temp);
+            // Leave the cache untouched but do NOT refresh the validity timestamp:
+            // once the last good reading ages out, isValid() will report false.
         } else {
             temperatureCache[i] = temp;
+            temperatureUpdatedTime[i] = now();
         }
         Serial.println(temperatureCache[i]);
     }
@@ -55,6 +58,8 @@ void TemperatureUtils::setup() {
     // temporary:
     temperatureCache.push_back(0); //put in an initial value for first sensor
     temperatureCache.assign(sensors->getDeviceCount(), 0);  // and others as well, if any
+    // One validity timestamp per cache slot, all "never read" until readTemperatures() runs.
+    temperatureUpdatedTime.assign(temperatureCache.size(), 0);
     readTemperatures(); // ensure we have some data
 
 
@@ -117,9 +122,20 @@ void TemperatureUtils::loop() {
     }
 }
 
+bool TemperatureUtils::isValid(u_int8_t sensorIndex) {
+    if (sensorIndex >= temperatureUpdatedTime.size()) return false; // no such sensor
+    time_t updated = temperatureUpdatedTime[sensorIndex];
+    if (updated == 0) return false; // never got a good reading
+    return (now() - updated) <= MAX_TEMP_VALIDITY_SECONDS;
+}
+
 float TemperatureUtils::getTempF(u_int8_t sensorIndex) {
+    // 0 is the "no trustworthy reading" sentinel (a real reading is always
+    // >= MINIMUM_VALID_TEMP_F); callers/UI treat it as a sensor fault.
+    if (!isValid(sensorIndex)) return 0;
     return temperatureCache[sensorIndex];
 }
 float TemperatureUtils::getTempC(u_int8_t sensorIndex) {
+    if (!isValid(sensorIndex)) return 0;
     return fToC(temperatureCache[sensorIndex]);
 }

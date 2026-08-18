@@ -542,14 +542,23 @@ void updateStatusBar(unsigned long frequency) {
 
       // LVGL's printf has float formatting disabled (LV_SPRINTF_USE_FLOAT 0), so build
       // the string with the standard library's snprintf (which supports %f) instead.
+      // water_temp == 0 is the controller's sensor-fault sentinel (a real reading
+      // is never 0): show a warning in place of the temperature. The heater is
+      // locked out controller-side whenever this happens.
+      char tempSeg[32];
+      if (lastServerStatus->water_temp == 0) {
+          snprintf(tempSeg, sizeof(tempSeg), "#ff4d4d " LV_SYMBOL_WARNING " SENSOR#");
+      } else {
+          snprintf(tempSeg, sizeof(tempSeg), "#33bdef %.1f%c#",
+                   toDisplayTemp(lastServerStatus->water_temp), displayUnitChar());
+      }
+
       char banner[96];
       if (lastServerStatus->winterized) {
-          // Prominent red notice; still show the water temperature.
-          snprintf(banner, sizeof(banner), "#ff4d4d " LV_SYMBOL_WARNING " WINTERIZED#   #33bdef %.1f%c#",
-                   toDisplayTemp(lastServerStatus->water_temp), displayUnitChar());
+          // Prominent red notice; still show the water temperature (or fault).
+          snprintf(banner, sizeof(banner), "#ff4d4d " LV_SYMBOL_WARNING " WINTERIZED#   %s", tempSeg);
       } else {
-          snprintf(banner, sizeof(banner), "#8fa6b6 %s#   #33bdef %.1f%c#", lastServerStatus->server_name,
-                   toDisplayTemp(lastServerStatus->water_temp), displayUnitChar());
+          snprintf(banner, sizeof(banner), "#8fa6b6 %s#   %s", lastServerStatus->server_name, tempSeg);
       }
       lv_label_set_text(bannerLabel, banner);
 
