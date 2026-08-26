@@ -10,6 +10,9 @@
 #include "web.h"
 #include "HotTubUtils.h"
 #include "ESPNowUtils.h"
+#ifdef ENABLE_BLE_BTHOME
+#include "BTHomeUtils.h"
+#endif
 
 // Interval at which to publish sensor readings
 #define ESP_STATUS_SEND_INTERVAL  1000
@@ -296,6 +299,11 @@ void setup(void) {
 
     spaStatus.setup();
     ESPNowUtils::setup();
+#ifdef ENABLE_BLE_BTHOME
+    // BLE BTHome broadcast of telemetry (water temp for now). Started after WiFi/ESP-NOW
+    // so the radio coexistence layer is already up. See BTHomeUtils.h. Opt-in build flag.
+    BTHomeUtils::setup("Hot Tub");
+#endif
     ESPNowUtils::registerCommandCallBackHandler((ESPNowUtils::hot_tub_command_recv_callback)espnowCommandReceived);
     ESPNowUtils::registerPairingCallBackHandler((ESPNowUtils::hot_tub_paired_callback)peerAdded);
 
@@ -310,6 +318,12 @@ void loop(void) {
     spaStatus.loop();
     ESPNowUtils::loop();
     sendStatus();
+#ifdef ENABLE_BLE_BTHOME
+    // Feed the latest water-temp reading to the BLE beacon; loop() throttles publishing.
+    BTHomeUtils::setWaterTemp(spaStatus.temperatureUtils.getTempF(0),
+                              spaStatus.temperatureUtils.isValid(0));
+    BTHomeUtils::loop();
+#endif
     yield();
 //    sleep(5);
 

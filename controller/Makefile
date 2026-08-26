@@ -8,6 +8,9 @@
 # `build_flags = -I..` in platformio.ini, so there is no symlink step anymore.
 
 PIO ?= pio
+# Default build has BLE/BTHome OFF. For the BLE variant, override the env, e.g.
+#   make upload ENV=controller-ble
+# (or `make upload-via-http ENV=controller-ble TARGET_IP=...`). See platformio.ini.
 ENV ?= controller
 PORT ?= /dev/ttyUSB0
 FIRMWARE = .pio/build/$(ENV)/firmware.bin
