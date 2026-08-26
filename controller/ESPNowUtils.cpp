@@ -64,10 +64,31 @@ void ESPNowUtils::OnDataSent(const esp_now_send_info_t *tx_info, esp_now_send_st
 #else
 void ESPNowUtils::OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 #endif
-    Serial.print("Last Packet Send Status: ");
-    Serial.print(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success to " : "Delivery Fail to ");
-    printMAC(mac_addr);
-    Serial.println();
+    // Only log when a peer's delivery result *changes*. In steady state each peer is
+    // consistently success or fail (e.g. a stale peer always fails), so logging every
+    // send buries all other serial output. Transitions are the interesting signal.
+    static uint64_t knownMac[8] = {0};
+    static bool     lastOk[8]   = {false};
+    uint64_t mac = 0;
+    for (int i = 0; i < 6; i++) mac = (mac << 8) | mac_addr[i];
+    bool ok = (status == ESP_NOW_SEND_SUCCESS);
+
+    int slot = -1, freeSlot = -1;
+    for (int i = 0; i < 8; i++) {
+        if (knownMac[i] == mac) { slot = i; break; }
+        if (knownMac[i] == 0 && freeSlot < 0) freeSlot = i;
+    }
+    bool changed = (slot < 0) || (lastOk[slot] != ok);
+    if (slot < 0) slot = (freeSlot >= 0) ? freeSlot : 0; // evict slot 0 if table full
+    knownMac[slot] = mac;
+    lastOk[slot]   = ok;
+
+    if (changed) {
+        Serial.print("Send status changed: ");
+        Serial.print(ok ? "Delivery Success to " : "Delivery Fail to ");
+        printMAC(mac_addr);
+        Serial.println();
+    }
 }
 
 void ESPNowUtils::OnDataRecv(const esp_now_recv_info* info, const uint8_t *incomingData, int len) {
