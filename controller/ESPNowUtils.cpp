@@ -111,9 +111,18 @@ void ESPNowUtils::OnDataRecv(const esp_now_recv_info* info, const uint8_t *incom
                     // request. Otherwise the peer locks onto the wrong channel (e.g. it
                     // scanned ch 7 while we are on ch 6) and can never hear us again.
                     pairingData.channel = WiFi.channel();
-                    Serial.println("send pairing response");
-                    esp_err_t result = esp_now_send(mac_addr, (uint8_t *) &pairingData, sizeof(pairingData));
+                    // Register the peer BEFORE replying: esp_now_send() to an
+                    // unknown peer fails with ESP_ERR_ESPNOW_NOT_FOUND, so sending
+                    // first would silently drop the response on the very first
+                    // contact (the client would then only ever get a reply on a
+                    // later retry that happens to align with its listen window).
                     if (addPeer(mac_addr)) {
+                        Serial.println("send pairing response");
+                        esp_err_t result = esp_now_send(mac_addr, (uint8_t *) &pairingData, sizeof(pairingData));
+                        if (result != ESP_OK) {
+                            Serial.print("Pairing response send failed: ");
+                            Serial.println(esp_err_to_name(result));
+                        }
                         if (pairedCallback != NULL) {
                             pairedCallback(&pairingData);
                         }
