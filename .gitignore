@@ -10,3 +10,6 @@ display/log
 display/log2
 time_examples.cpp
 libs
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
