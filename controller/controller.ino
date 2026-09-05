@@ -2,6 +2,7 @@
 #include <WiFiClient.h>
 //#include <WebServer.h>
 #include <ESPmDNS.h>
+#include <DNSServer.h>
 #include <ArduinoJson.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
@@ -13,6 +14,18 @@
 #ifdef ENABLE_BLE_BTHOME
 #include "BTHomeUtils.h"
 #endif
+
+// Hostname advertised over mDNS: reach the controller at http://<name>.local on the
+// home network instead of hunting for a DHCP-assigned IP. Override in secrets.h.
+#ifndef MDNS_HOSTNAME
+#define MDNS_HOSTNAME "hottub"
+#endif
+
+// Captive-portal DNS: while the SoftAP is up we answer every DNS query with the AP's
+// own IP, so joining the "hottubctl" network pops the control page up automatically
+// (no need to type 192.168.4.1).
+static const byte DNS_PORT = 53;
+DNSServer dnsServer;
 
 // Interval at which to publish sensor readings
 #define ESP_STATUS_SEND_INTERVAL  1000
@@ -142,6 +155,10 @@ void setupWIFI() {
     // To support ESP-NOW
     // Set the device as a Station and Soft Access Point simultaneously
     WiFi.mode(WIFI_AP_STA);
+    // Advertise a DHCP hostname *before* connecting so the router registers it. Many
+    // home routers then resolve http://<name> (or <name>.lan) on the LAN — which,
+    // unlike mDNS/.local, actually works from Android and Linux browsers.
+    WiFi.setHostname(MDNS_HOSTNAME);
     // Connect to WiFi network
     if (app_preferences.isKey("wifi_ssid")) {
       WiFi.begin(app_preferences.getString("wifi_ssid"), app_preferences.getString("wifi_pass"));
@@ -156,6 +173,12 @@ void setupSoftAP() {
     //
     WiFi.softAP(SOFTAP_WIFI_NAME, SOFTAP_WIFI_PASS);
     Serial.printf("Software Access Point available at %s/%s", SOFTAP_WIFI_NAME, SOFTAP_WIFI_PASS == NULL ? "(NOT SET)": SOFTAP_WIFI_PASS);
+
+    // Resolve every hostname to the SoftAP IP so phones detect a captive portal and
+    // open the control/setup page automatically on joining the network.
+    dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
+    dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
+    Serial.printf("Captive portal DNS started on %s\n", WiFi.softAPIP().toString().c_str());
 }
 
 //
@@ -195,16 +218,10 @@ void setup(void) {
     setupSoftAP();
     setupWIFI();
 
-//    /*use mdns for host name resolution*/
-//    if (!MDNS.begin(WIFI_HOST)) { //http://esp32.local
-//        Serial.println("Error setting up MDNS responder!");
-//        while (1) {
-//            delay(1000);
-//        }
-//    }
+    // mDNS is (re)started from the WiFiGotIP event, once the STA actually has an IP,
+    // so the responder binds to the LAN interface and not just the SoftAP.
 
     SPIFFS.begin();
-    Serial.println("mDNS responder started");
 
     server.on("/status", HTTP_GET, []() {
         spaStatus.updateStatusString();
@@ -311,8 +328,18 @@ void setup(void) {
 
 void loop(void) {
     static unsigned long lastHttpReportTime = 0;
+    static unsigned long lastTimeUpdate = 0;
 
-    setDeviceTime();
+    // setDeviceTime() calls getLocalTime(..., 9), which blocks for the full 9ms whenever
+    // the clock is not NTP-synced (e.g. during SoftAP setup, before any home WiFi is set).
+    // Running it every loop throttles the loop to ~100Hz, which starves the captive-portal
+    // DNS and single-threaded WebServer once wildcard DNS funnels all client traffic at us.
+    // Second-resolution time is plenty for scheduling, so update it at most once a second.
+    if (millis() - lastTimeUpdate >= 1000) {
+        lastTimeUpdate = millis();
+        setDeviceTime();
+    }
+    dnsServer.processNextRequest();
     server.handleClient();
     processCommandQueue();
     spaStatus.loop();
@@ -440,6 +467,20 @@ void WiFiGotIP(WiFiEvent_t event, WiFiEventInfo_t info){
     Serial.println("WiFi connected");
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
+
+    // (Re)start mDNS now that the STA has an IP so the responder binds to the LAN
+    // interface. Restart on every reconnect so it re-announces after the link drops.
+    static bool mdnsStarted = false;
+    if (mdnsStarted) {
+        MDNS.end();
+    }
+    if (MDNS.begin(MDNS_HOSTNAME)) {
+        MDNS.addService("http", "tcp", 80);
+        mdnsStarted = true;
+        Serial.printf("mDNS responder started: http://%s.local\n", MDNS_HOSTNAME);
+    } else {
+        Serial.println("Error setting up mDNS responder!");
+    }
 }
 
 void WiFiStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info){

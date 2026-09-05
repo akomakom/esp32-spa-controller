@@ -1,3 +1,4 @@
+#include <WiFi.h>
 #include "core.h"
 #include "web.h"
 #include "secrets.h"
@@ -20,8 +21,34 @@ bool requireAuth() {
     return true;
 }
 
+// Hostname advertised over mDNS (keep in sync with controller.ino). Requests whose
+// Host header matches this, the SoftAP IP, or the STA IP are treated as direct visits;
+// anything else arriving on the SoftAP is an OS captive-portal probe.
+#ifndef MDNS_HOSTNAME
+#define MDNS_HOSTNAME "hottub"
+#endif
+
 const char *WEB_RESPONSE_OK = R"({ "success": true })";
 const char *WEB_RESPONSE_FAIL = R"({ "success": false })";
+
+// When a phone joins the SoftAP, the OS probes a known URL (captive.apple.com,
+// connectivitycheck.gstatic.com, msftconnecttest.com, ...). Because our captive DNS
+// resolves every name to the AP IP, those probes land here with a foreign Host header.
+// Answering with a 302 to the control page makes the OS pop up the captive-portal browser
+// automatically. Returns true if it handled (redirected) the request.
+bool handleCaptivePortal() {
+    String host = server.hostHeader();
+    String apIP = WiFi.softAPIP().toString();
+    String staIP = WiFi.localIP().toString();
+    if (host == apIP ||
+        (staIP.length() && staIP != "0.0.0.0" && host == staIP) ||
+        host.equalsIgnoreCase(String(MDNS_HOSTNAME) + ".local")) {
+        return false; // direct visit to a known address — serve normally
+    }
+    server.sendHeader("Location", String("http://") + apIP + "/", true);
+    server.send(302, "text/plain", "");
+    return true;
+}
 
 /*
  * Login page
@@ -360,6 +387,8 @@ void setupServerDefaultActions() {
     //called when the url is not defined here
     //use it to load content from SPIFFS
     server.onNotFound([](){
+        // Redirect OS captive-portal probes to the control page (SoftAP visitors).
+        if (handleCaptivePortal()) return;
         if(!handleFileRead(server.uri()))
             server.send(404, "text/plain", "FileNotFound");
     });

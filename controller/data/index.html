@@ -49,6 +49,23 @@
       box-shadow: var(--shadow);
     }
     #settingsBtn:active { background: var(--panel-2); }
+    /* draw attention to Settings when the user is on the SoftAP and still needs
+       to point the controller at their home WiFi */
+    #settingsBtn.pulse {
+      border-color: #2f9bff; color: #2f9bff;
+      animation: gearpulse 1.4s ease-in-out infinite;
+    }
+    @keyframes gearpulse {
+      0%, 100% { box-shadow: var(--shadow); transform: scale(1); }
+      50% { box-shadow: 0 0 0 4px rgba(47,155,255,.35); transform: scale(1.06); }
+    }
+    #setupBanner {
+      display: none; cursor: pointer;
+      background: #2f9bff; color: #04233f; font-weight: 800;
+      text-align: center; padding: 12px 16px; border-radius: 10px;
+      margin-bottom: 14px; letter-spacing: .02em; font-size: 15px;
+      box-shadow: var(--shadow);
+    }
 
     /* ---- winterized banner ---- */
     #winterBanner, #sensorBanner {
@@ -177,6 +194,7 @@
 
   <div id="winterBanner">&#10052; WINTERIZED &mdash; all controls forced OFF (schedules ignored)</div>
   <div id="sensorBanner">&#9888; WATER SENSOR FAULT &mdash; heater disabled (no valid temperature reading)</div>
+  <div id="setupBanner">&#9881; You're connected directly to the hot tub. Tap here to connect it to your home WiFi &rarr;</div>
 
   <div id="topbar">
     <div class="metric" id="m-water">
@@ -733,11 +751,24 @@
   window.addEventListener("resize", function () { var d = document.getElementById("scheduleDialog"); if (d && d.open) drawTimeline(); });
 
   // ---- settings dialog ----
-  document.getElementById("settingsBtn").addEventListener("click", function () {
+  function openSettings() {
     markUnit();
     markWinter();
     document.getElementById("settingsDialog").showModal();
-  });
+  }
+  document.getElementById("settingsBtn").addEventListener("click", openSettings);
+
+  // When reached over the controller's own SoftAP (captive portal / direct join), the
+  // browser's host is the AP IP. In that case the user almost certainly wants to point
+  // the unit at their home WiFi, so make Settings impossible to miss.
+  (function () {
+    var onSoftAP = location.hostname === "192.168.4.1";
+    if (!onSoftAP) return;
+    document.getElementById("settingsBtn").classList.add("pulse");
+    var banner = document.getElementById("setupBanner");
+    banner.style.display = "block";
+    banner.addEventListener("click", openSettings);
+  })();
   function markUnit() {
     document.querySelectorAll("#unitSeg button").forEach(function (b) {
       b.classList.toggle("sel", Number(b.dataset.unit) === unit);
